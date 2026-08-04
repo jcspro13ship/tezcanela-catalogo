@@ -1,7 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { productos } from '../data/productos'
-import { variantesPorProducto } from '../data/variantes'
+import { useCatalogo, variantesDe } from '../context/CatalogoContext'
 import { formatoPrecio } from '../components/ProductoCard'
 import ImagenProducto from '../components/ImagenProducto'
 import { useCart } from '../context/CartContext'
@@ -10,17 +9,32 @@ export default function ProductoDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { addItem } = useCart()
+  const { productos, variantes: todasLasVariantes, cargando } = useCatalogo()
 
   const producto = productos.find((p) => p.id === id)
-  const variantes = useMemo(() => variantesPorProducto(id), [id])
+  const variantes = useMemo(() => variantesDe(todasLasVariantes, id), [todasLasVariantes, id])
 
   const colores = useMemo(() => [...new Set(variantes.map((v) => v.color))], [variantes])
   const tallas = useMemo(() => [...new Set(variantes.map((v) => v.talla))], [variantes])
 
-  const [colorSeleccionado, setColorSeleccionado] = useState(colores[0] ?? null)
+  const [colorSeleccionado, setColorSeleccionado] = useState(null)
   const [tallaSeleccionada, setTallaSeleccionada] = useState(null)
   const [cantidad, setCantidad] = useState(1)
   const [mensaje, setMensaje] = useState('')
+
+  useEffect(() => {
+    if (!colorSeleccionado && colores.length > 0) {
+      setColorSeleccionado(colores[0])
+    }
+  }, [colores, colorSeleccionado])
+
+  if (cargando) {
+    return (
+      <div className="pagina-producto">
+        <p>Cargando producto...</p>
+      </div>
+    )
+  }
 
   if (!producto) {
     return (

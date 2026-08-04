@@ -32,7 +32,3 @@ export const variantes = [
   ...generarVariantes('p7', ['Blanco', 'Amarillo'], 5),
   ...generarVariantes('p8', ['Azul', 'Negro'], 7),
 ]
-
-export function variantesPorProducto(productoId) {
-  return variantes.filter((v) => v.producto_id === productoId)
-}

@@ -1,15 +1,16 @@
 import { useMemo, useState } from 'react'
-import { productos } from '../data/productos'
+import { useCatalogo } from '../context/CatalogoContext'
 import ProductoCard from '../components/ProductoCard'
 
 export default function Catalogo() {
+  const { productos, cargando } = useCatalogo()
   const [categoria, setCategoria] = useState('Todas')
   const [busqueda, setBusqueda] = useState('')
 
   const categorias = useMemo(() => {
     const unicas = new Set(productos.map((p) => p.categoria))
     return ['Todas', ...unicas]
-  }, [])
+  }, [productos])
 
   const productosFiltrados = useMemo(() => {
     return productos.filter((p) => {
@@ -18,7 +19,7 @@ export default function Catalogo() {
       if (busqueda && !p.nombre.toLowerCase().includes(busqueda.toLowerCase())) return false
       return true
     })
-  }, [categoria, busqueda])
+  }, [productos, categoria, busqueda])
 
   return (
     <div className="pagina-catalogo">
@@ -45,7 +46,9 @@ export default function Catalogo() {
         </div>
       </div>
 
-      {productosFiltrados.length === 0 ? (
+      {cargando ? (
+        <p className="catalogo-vacio">Cargando catálogo...</p>
+      ) : productosFiltrados.length === 0 ? (
         <p className="catalogo-vacio">No encontramos productos con ese filtro.</p>
       ) : (
         <div className="catalogo-grid">
