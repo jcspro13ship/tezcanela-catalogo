@@ -23,7 +23,15 @@ Mientras no se conecte el Sheet, el sitio usa datos de ejemplo (`src/data/produc
 
 ## 1. Crear el Google Sheet
 
-Crea un Google Sheet nuevo con **dos pestañas**, con estos nombres y columnas exactos (mayúsculas/minúsculas importan):
+Ya existe un Excel armado con la estructura exacta y datos de ejemplo: [`docs/TezCanela_Inventario_Base.xlsx`](TezCanela_Inventario_Base.xlsx). Es más rápido partir de ahí que crear las pestañas a mano:
+
+1. Entra a [sheets.google.com](https://sheets.google.com) → **Archivo → Importar → Subir** y selecciona `TezCanela_Inventario_Base.xlsx`.
+2. Elige **"Insertar nuevas hojas"** (o "Reemplazar hoja de cálculo" si es un Sheet recién creado y vacío).
+3. Queda un Google Sheet con 3 pestañas: `Léeme` (instrucciones), `Productos` y `Variantes`, ya con datos de ejemplo cargados (los mismos que trae el sitio por defecto).
+4. Borra las filas de ejemplo y carga el inventario real cuando esté listo (ver `docs/MANUAL_INVENTARIO.docx`).
+5. Comparte el Sheet con quien vaya a mantenerlo (Fanny y su equipo) con permiso de edición.
+
+Si en algún momento prefieres armar la estructura desde cero en vez de importar el Excel, estas son las columnas exactas que debe tener cada pestaña (mayúsculas/minúsculas importan):
 
 ### Pestaña `Productos`
 
