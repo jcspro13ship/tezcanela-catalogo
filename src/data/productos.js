@@ -1,0 +1,78 @@
+// DATOS DE EJEMPLO — se reemplazan por el inventario real de Fanny.
+// Estructura pensada para mapear 1:1 con la hoja "Productos" de Google Sheets:
+// id | nombre | categoria | descripcion | precio | imagen | activo
+
+export const productos = [
+  {
+    id: 'p1',
+    nombre: 'Vestido Amelia',
+    categoria: 'Vestidos',
+    descripcion: 'Vestido midi de manga larga, tela liviana ideal para clima cálido. Corte entallado en la cintura.',
+    precio: 189000,
+    imagen: null,
+    activo: true,
+  },
+  {
+    id: 'p2',
+    nombre: 'Blusa Valeria',
+    categoria: 'Blusas',
+    descripcion: 'Blusa de cuello en V con botones frontales, tela fresca de algodón.',
+    precio: 89000,
+    imagen: null,
+    activo: true,
+  },
+  {
+    id: 'p3',
+    nombre: 'Pantalón Camila',
+    categoria: 'Pantalones',
+    descripcion: 'Pantalón palazzo de tiro alto, tela con caída elegante.',
+    precio: 129000,
+    imagen: null,
+    activo: true,
+  },
+  {
+    id: 'p4',
+    nombre: 'Falda Renata',
+    categoria: 'Faldas',
+    descripcion: 'Falda midi plisada, cierre invisible lateral.',
+    precio: 99000,
+    imagen: null,
+    activo: true,
+  },
+  {
+    id: 'p5',
+    nombre: 'Chaqueta Ivonne',
+    categoria: 'Chaquetas',
+    descripcion: 'Chaqueta corta estructurada, forro interno, cierre de botones.',
+    precio: 219000,
+    imagen: null,
+    activo: true,
+  },
+  {
+    id: 'p6',
+    nombre: 'Vestido Sofía',
+    categoria: 'Vestidos',
+    descripcion: 'Vestido corto sin mangas, escote redondo, tela elástica.',
+    precio: 159000,
+    imagen: null,
+    activo: true,
+  },
+  {
+    id: 'p7',
+    nombre: 'Blusa Daniela',
+    categoria: 'Blusas',
+    descripcion: 'Blusa cropped de manga corta, ideal para combinar con jeans o faldas altas.',
+    precio: 79000,
+    imagen: null,
+    activo: true,
+  },
+  {
+    id: 'p8',
+    nombre: 'Pantalón Laura',
+    categoria: 'Pantalones',
+    descripcion: 'Jean recto de tiro medio, tela stretch cómoda.',
+    precio: 139000,
+    imagen: null,
+    activo: true,
+  },
+]

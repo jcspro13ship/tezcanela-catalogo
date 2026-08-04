@@ -1,0 +1,24 @@
+import { Routes, Route } from 'react-router-dom'
+import Layout from './components/Layout'
+import Inicio from './pages/Inicio'
+import Nosotros from './pages/Nosotros'
+import Catalogo from './pages/Catalogo'
+import ProductoDetalle from './pages/ProductoDetalle'
+import Carrito from './pages/Carrito'
+import { CartProvider } from './context/CartContext'
+
+export default function App() {
+  return (
+    <CartProvider>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Inicio />} />
+          <Route path="nosotros" element={<Nosotros />} />
+          <Route path="catalogo" element={<Catalogo />} />
+          <Route path="producto/:id" element={<ProductoDetalle />} />
+          <Route path="carrito" element={<Carrito />} />
+        </Route>
+      </Routes>
+    </CartProvider>
+  )
+}

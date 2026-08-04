@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tezcanela-dev",
+      "runtimeExecutable": "/Users/juancarlossantos/.tezcanela-dev.sh",
+      "runtimeArgs": [],
+      "port": 5173
+    }
+  ]
+}
