@@ -60,13 +60,27 @@ Cada producto puede tener una o más fotos (con modelo, sin modelo, detalle de t
 
 | producto_id | orden | url |
 |-------------|-------|-----|
-| p1 | 1 | https://drive.google.com/thumbnail?id=XXXX&sz=w1000 |
-| p1 | 2 | https://drive.google.com/thumbnail?id=YYYY&sz=w1000 |
+| p1 | 1 | https://res.cloudinary.com/sa0ainfh/image/upload/v.../tezcanela/p1_modelo.jpg |
+| p1 | 2 | https://res.cloudinary.com/sa0ainfh/image/upload/v.../tezcanela/p1_plana.jpg |
 
 - `producto_id`: igual que en Variantes, debe coincidir con el `id` de Productos.
 - `orden`: número que define en qué posición aparece esa foto (1 = portada, la que se ve en el catálogo).
-- `url`: link público de la imagen. Si son fotos de Google Drive, el archivo debe estar compartido como "Cualquier persona con el enlace puede ver", y la URL debe tener el formato `https://drive.google.com/thumbnail?id=ID_DEL_ARCHIVO&sz=w1000` (no el link normal de "Compartir", que no sirve como imagen directa).
+- `url`: link público de la imagen, **subida a Cloudinary** (ver siguiente sección — no usar links de Google Drive).
 - Si un producto no tiene ninguna fila en esta pestaña, el sitio revisa si la columna `imagen` de Productos (formato anterior) tiene algo cargado, y si no, muestra el placeholder con el nombre del producto.
+
+#### ⚠️ Por qué las fotos van en Cloudinary y no en Google Drive
+
+Al probar el catálogo con fotos reales, encontramos que **Google Drive bloquea que sus imágenes se muestren incrustadas (`<img>`) en un sitio externo**, aunque el archivo esté compartido como "público". El link de Drive abre bien si lo pegas solo en el navegador, pero falla silenciosamente cuando el sitio intenta mostrarlo como foto — por eso las primeras pruebas con fotos de Drive fallaron. Drive no está pensado para esto; **Cloudinary sí**.
+
+**Cómo subir una foto nueva a Cloudinary (2 minutos, sin conocimientos técnicos):**
+
+1. Entra a [cloudinary.com](https://cloudinary.com) e inicia sesión con la cuenta del proyecto (cloud name: `sa0ainfh`).
+2. En el menú, ve a **Media Library**.
+3. Arrastra la foto (o varias) a la ventana, o usa el botón **Upload**.
+4. Cuando termine de subir, haz clic en la foto → copia el link que dice **"Copy URL"** (debe verse como `https://res.cloudinary.com/sa0ainfh/image/upload/.../archivo.jpg`).
+5. Pega ese link en la columna `url` de la pestaña `Imagenes`, en la fila del producto correspondiente.
+
+No hace falta redimensionar ni comprimir la foto antes de subirla — el sitio le pide a Cloudinary el tamaño que necesita en cada caso (miniatura, foto grande) automáticamente.
 
 > El instructivo simple para cargar productos día a día (pensado para el equipo de Fanny) está en `docs/MANUAL_INVENTARIO.docx`.
 
@@ -154,7 +168,7 @@ Abre la URL que muestra la terminal (por defecto `http://localhost:5173`).
 
 - **Datos del comprador:** antes de enviar el pedido por WhatsApp, el carrito pide nombre, teléfono y correo (obligatorios) y los incluye en el mensaje. No se guardan en ningún lado — solo viajan dentro del mensaje de WhatsApp.
 - **Catálogo con muchas referencias:** la grilla del catálogo muestra 24 productos y agrega un botón "Cargar más" para el resto, en vez de renderizar las 500 de una vez. El filtro por categoría y el buscador funcionan sobre todo el catálogo ya cargado (no hace falta "cargar más" para que el filtro encuentre algo).
-- **Fotos:** las tarjetas del catálogo piden la foto en baja resolución (500px de ancho) y la ficha de producto en alta (1000px), reutilizando la misma URL de Drive con distinto tamaño. Además usan `loading="lazy"`, así el navegador no descarga fotos que están fuera de pantalla.
+- **Fotos:** las tarjetas del catálogo piden la foto en baja resolución (500px de ancho) y la ficha de producto en alta (1000px), reutilizando la misma URL de Cloudinary con una transformación de tamaño distinta. Además usan `loading="lazy"`, así el navegador no descarga fotos que están fuera de pantalla.
 - **Varias personas viendo a la vez:** el Apps Script cachea su respuesta 5 minutos (ver sección 2), así que aunque haya varias visitas simultáneas, no todas disparan una lectura completa del Sheet.
 
 ---
