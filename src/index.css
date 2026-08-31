@@ -206,6 +206,8 @@ main {
   width: 100%;
   border-radius: 8px;
   overflow: hidden;
+  display: block;
+  object-fit: cover;
 }
 
 .producto-card-info {
@@ -260,8 +262,11 @@ main {
 
 .producto-detalle-imagen {
   aspect-ratio: 3 / 4;
+  width: 100%;
   border-radius: 8px;
   overflow: hidden;
+  display: block;
+  object-fit: cover;
 }
 
 .producto-detalle-precio {
