@@ -54,6 +54,20 @@ Si en algún momento prefieres armar la estructura desde cero en vez de importar
 - `sku`: código único de esa combinación talla-color (puede ser el que ya maneje el negocio, o simplemente `id-color-talla`).
 - Una fila por cada combinación talla-color que exista de ese producto.
 
+### Pestaña `Imagenes` (varias fotos por producto)
+
+Cada producto puede tener una o más fotos (con modelo, sin modelo, detalle de tela, etc.). Una fila por foto:
+
+| producto_id | orden | url |
+|-------------|-------|-----|
+| p1 | 1 | https://drive.google.com/thumbnail?id=XXXX&sz=w1000 |
+| p1 | 2 | https://drive.google.com/thumbnail?id=YYYY&sz=w1000 |
+
+- `producto_id`: igual que en Variantes, debe coincidir con el `id` de Productos.
+- `orden`: número que define en qué posición aparece esa foto (1 = portada, la que se ve en el catálogo).
+- `url`: link público de la imagen. Si son fotos de Google Drive, el archivo debe estar compartido como "Cualquier persona con el enlace puede ver", y la URL debe tener el formato `https://drive.google.com/thumbnail?id=ID_DEL_ARCHIVO&sz=w1000` (no el link normal de "Compartir", que no sirve como imagen directa).
+- Si un producto no tiene ninguna fila en esta pestaña, el sitio revisa si la columna `imagen` de Productos (formato anterior) tiene algo cargado, y si no, muestra el placeholder con el nombre del producto.
+
 > El instructivo simple para cargar productos día a día (pensado para el equipo de Fanny) está en `docs/MANUAL_INVENTARIO.docx`.
 
 ---
@@ -72,7 +86,9 @@ Si en algún momento prefieres armar la estructura desde cero en vez de importar
 8. Clic en **Implementar**. Google puede pedir autorizar permisos (es tu propio script, es seguro aceptar).
 9. Copia la **URL de la aplicación web** que te entrega (termina en `/exec`).
 
-Cada vez que edites el código del script (`Code.gs`) tienes que volver a "Implementar → Gestionar implementaciones → editar → Nueva versión" para que el cambio quede activo. Editar los datos del Sheet (productos, precios, stock) **no** requiere volver a implementar — se reflejan solos.
+Cada vez que edites el código del script (`Code.gs`) tienes que volver a "Implementar → Gestionar implementaciones → editar → Nueva versión" para que el cambio quede activo. Editar los datos del Sheet (productos, precios, stock) **no** requiere volver a implementar — se reflejan solos, aunque pueden tardar hasta 5 minutos en verse por la caché (ver abajo).
+
+**Caché:** el script guarda el resultado por 5 minutos (`CacheService`) para no releer todo el Sheet en cada visita — importante cuando hay varias personas viendo el catálogo al mismo tiempo o cuando crezca a cientos de productos. Si necesitas ver un cambio de inmediato sin esperar los 5 minutos, vuelve a implementar una nueva versión del script (eso limpia la ejecución en curso) o simplemente espera.
 
 ---
 
@@ -131,6 +147,15 @@ Abre la URL que muestra la terminal (por defecto `http://localhost:5173`).
 1. En GitHub → Settings → Pages, agregar el dominio del cliente como "Custom domain".
 2. En el proveedor de DNS del cliente, crear los registros que GitHub indique (normalmente un registro `A` apuntando a las IPs de GitHub Pages, o un `CNAME` si es subdominio).
 3. Esperar propagación DNS (puede tardar minutos u horas) y activar "Enforce HTTPS" en GitHub Pages una vez esté verificado.
+
+---
+
+## 7. Datos del comprador y rendimiento con ~500 referencias
+
+- **Datos del comprador:** antes de enviar el pedido por WhatsApp, el carrito pide nombre, teléfono y correo (obligatorios) y los incluye en el mensaje. No se guardan en ningún lado — solo viajan dentro del mensaje de WhatsApp.
+- **Catálogo con muchas referencias:** la grilla del catálogo muestra 24 productos y agrega un botón "Cargar más" para el resto, en vez de renderizar las 500 de una vez. El filtro por categoría y el buscador funcionan sobre todo el catálogo ya cargado (no hace falta "cargar más" para que el filtro encuentre algo).
+- **Fotos:** las tarjetas del catálogo piden la foto en baja resolución (500px de ancho) y la ficha de producto en alta (1000px), reutilizando la misma URL de Drive con distinto tamaño. Además usan `loading="lazy"`, así el navegador no descarga fotos que están fuera de pantalla.
+- **Varias personas viendo a la vez:** el Apps Script cachea su respuesta 5 minutos (ver sección 2), así que aunque haya varias visitas simultáneas, no todas disparan una lectura completa del Sheet.
 
 ---
 

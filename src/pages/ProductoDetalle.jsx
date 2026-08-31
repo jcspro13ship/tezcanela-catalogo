@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useCatalogo, variantesDe } from '../context/CatalogoContext'
 import { formatoPrecio } from '../components/ProductoCard'
-import ImagenProducto from '../components/ImagenProducto'
+import GaleriaProducto from '../components/GaleriaProducto'
 import { useCart } from '../context/CartContext'
 
 export default function ProductoDetalle() {
@@ -83,7 +83,7 @@ export default function ProductoDetalle() {
       </Link>
 
       <div className="producto-detalle">
-        <ImagenProducto producto={producto} className="producto-detalle-imagen" />
+        <GaleriaProducto producto={producto} className="producto-detalle-imagen" />
 
         <div className="producto-detalle-info">
           <p className="producto-card-categoria">{producto.categoria}</p>

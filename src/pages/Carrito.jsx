@@ -1,9 +1,12 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { formatoPrecio } from '../components/ProductoCard'
 import { WHATSAPP_NUMBER } from '../config'
 
-function construirMensajeWhatsApp(items, total) {
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function construirMensajeWhatsApp(items, total, cliente) {
   const lineas = items.map(
     (it) =>
       `• ${it.nombre} — Talla ${it.talla}, Color ${it.color} — Cant: ${it.cantidad} — ${formatoPrecio(
@@ -16,12 +19,19 @@ function construirMensajeWhatsApp(items, total) {
     ...lineas,
     '',
     `Total: ${formatoPrecio(total)}`,
+    '',
+    'Mis datos:',
+    `Nombre: ${cliente.nombre}`,
+    `Teléfono: ${cliente.telefono}`,
+    `Correo: ${cliente.email}`,
   ].join('\n')
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(cuerpo)}`
 }
 
 export default function Carrito() {
   const { items, removeItem, updateCantidad, total } = useCart()
+  const [cliente, setCliente] = useState({ nombre: '', telefono: '', email: '' })
+  const [error, setError] = useState('')
 
   if (items.length === 0) {
     return (
@@ -33,6 +43,33 @@ export default function Carrito() {
         </Link>
       </div>
     )
+  }
+
+  function actualizarCliente(campo, valor) {
+    setCliente((c) => ({ ...c, [campo]: valor }))
+    setError('')
+  }
+
+  function handleEnviar() {
+    const nombre = cliente.nombre.trim()
+    const telefono = cliente.telefono.trim()
+    const email = cliente.email.trim()
+
+    if (!nombre || !telefono || !email) {
+      setError('Completa nombre, teléfono y correo para poder enviar el pedido.')
+      return
+    }
+    if (telefono.replace(/\D/g, '').length < 7) {
+      setError('Revisa el número de teléfono.')
+      return
+    }
+    if (!EMAIL_REGEX.test(email)) {
+      setError('Revisa el correo electrónico.')
+      return
+    }
+
+    const url = construirMensajeWhatsApp(items, total, { nombre, telefono, email })
+    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -66,14 +103,41 @@ export default function Carrito() {
         <span>{formatoPrecio(total)}</span>
       </div>
 
-      <a
-        href={construirMensajeWhatsApp(items, total)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="boton boton-primario boton-whatsapp"
-      >
+      <div className="checkout-form">
+        <label>
+          Nombre completo
+          <input
+            type="text"
+            value={cliente.nombre}
+            onChange={(e) => actualizarCliente('nombre', e.target.value)}
+            placeholder="Tu nombre"
+          />
+        </label>
+        <label>
+          Teléfono
+          <input
+            type="tel"
+            value={cliente.telefono}
+            onChange={(e) => actualizarCliente('telefono', e.target.value)}
+            placeholder="300 000 0000"
+          />
+        </label>
+        <label>
+          Correo electrónico
+          <input
+            type="email"
+            value={cliente.email}
+            onChange={(e) => actualizarCliente('email', e.target.value)}
+            placeholder="tucorreo@ejemplo.com"
+          />
+        </label>
+      </div>
+
+      {error && <p className="checkout-error">{error}</p>}
+
+      <button className="boton boton-primario boton-whatsapp" onClick={handleEnviar}>
         Enviar pedido por WhatsApp
-      </a>
+      </button>
     </div>
   )
 }

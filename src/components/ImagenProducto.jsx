@@ -1,8 +1,19 @@
-// Placeholder mientras no hay fotos reales de producto cargadas.
-// Cuando el inventario tenga columna "imagen" con URL, se usa esa directamente.
-export default function ImagenProducto({ producto, className = '' }) {
-  if (producto.imagen) {
-    return <img src={producto.imagen} alt={producto.nombre} className={className} />
+import { conAncho } from '../utils/imagenUrl'
+
+// Placeholder mientras un producto no tiene fotos cargadas.
+// Muestra la primera foto del producto (portada), en baja resolución
+// porque esto se usa en el grid del catálogo (hasta cientos de tarjetas).
+export default function ImagenProducto({ producto, className = '', ancho = 500 }) {
+  const portada = producto.imagenes && producto.imagenes[0]
+  if (portada) {
+    return (
+      <img
+        src={conAncho(portada, ancho)}
+        alt={producto.nombre}
+        className={className}
+        loading="lazy"
+      />
+    )
   }
   return (
     <div className={`placeholder-imagen ${className}`}>

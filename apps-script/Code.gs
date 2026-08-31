@@ -1,20 +1,53 @@
 // Este script se pega en Extensiones > Apps Script del Google Sheet del catálogo.
-// Sirve los datos de las hojas "Productos" y "Variantes" como JSON, para que
-// el sitio web los lea automáticamente. No requiere instalar nada más.
+// Sirve los datos de las hojas "Productos", "Variantes" e "Imagenes" como JSON,
+// para que el sitio web los lea automáticamente. No requiere instalar nada más.
 //
 // Ver docs/INSTRUCTIVO_TECNICO.md para el paso a paso de instalación y publicación.
 
+var CACHE_KEY = 'catalogo_json_v1'
+var CACHE_SEGUNDOS = 300 // 5 minutos: evita releer todo el Sheet en cada visita
+
 function doGet(e) {
+  var cache = CacheService.getScriptCache()
+  var cacheado = cache.get(CACHE_KEY)
+  if (cacheado) {
+    return ContentService.createTextOutput(cacheado).setMimeType(ContentService.MimeType.JSON)
+  }
+
   var ss = SpreadsheetApp.getActiveSpreadsheet()
 
+  var imagenesPorProducto = {}
+  sheetToObjects(ss.getSheetByName('Imagenes')).forEach(function (img) {
+    var pid = String(img.producto_id)
+    if (!imagenesPorProducto[pid]) imagenesPorProducto[pid] = []
+    imagenesPorProducto[pid].push({
+      orden: Number(img.orden) || 0,
+      url: String(img.url),
+    })
+  })
+  Object.keys(imagenesPorProducto).forEach(function (pid) {
+    imagenesPorProducto[pid].sort(function (a, b) {
+      return a.orden - b.orden
+    })
+  })
+
   var productos = sheetToObjects(ss.getSheetByName('Productos')).map(function (p) {
+    var id = String(p.id)
+    var imagenes = (imagenesPorProducto[id] || []).map(function (img) {
+      return img.url
+    })
+    // Compatibilidad: si el producto no tiene filas en "Imagenes" pero sí tiene
+    // algo en la columna "imagen" (formato anterior), se usa como única foto.
+    if (imagenes.length === 0 && p.imagen) {
+      imagenes = [String(p.imagen)]
+    }
     return {
-      id: String(p.id),
+      id: id,
       nombre: p.nombre,
       categoria: p.categoria,
       descripcion: p.descripcion,
       precio: Number(p.precio) || 0,
-      imagen: p.imagen ? String(p.imagen) : null,
+      imagenes: imagenes,
       activo: esVerdadero(p.activo),
     }
   })
@@ -35,9 +68,10 @@ function doGet(e) {
     actualizado: new Date().toISOString(),
   }
 
-  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(
-    ContentService.MimeType.JSON
-  )
+  var json = JSON.stringify(data)
+  cache.put(CACHE_KEY, json, CACHE_SEGUNDOS)
+
+  return ContentService.createTextOutput(json).setMimeType(ContentService.MimeType.JSON)
 }
 
 // Convierte una hoja (con fila de encabezados) en una lista de objetos.
