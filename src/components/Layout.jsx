@@ -8,7 +8,7 @@ export default function Layout() {
     <div className="layout">
       <header className="header">
         <Link to="/" className="header-logo">
-          <img src="/logo-tezcanela.png" alt="Tez Canela" />
+          <img src={`${import.meta.env.BASE_URL}logo-tezcanela.png`} alt="Tez Canela" />
         </Link>
         <nav className="header-nav">
           <NavLink to="/" end>

@@ -4,7 +4,11 @@ export default function Inicio() {
   return (
     <div className="pagina-inicio">
       <section className="hero">
-        <img src="/logo-tezcanela.png" alt="Tez Canela" className="hero-logo" />
+        <img
+          src={`${import.meta.env.BASE_URL}logo-tezcanela.png`}
+          alt="Tez Canela"
+          className="hero-logo"
+        />
         <p className="hero-eslogan">Moda que refleja tu esencia</p>
         <Link to="/catalogo" className="boton boton-primario">
           Ver catálogo
