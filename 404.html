@@ -12,12 +12,15 @@
       var pathSegmentsToKeep = 1 // 1 = repo en subcarpeta (github.io/repo/...). Si en el futuro se sirve desde un dominio propio (raíz), cambiar a 0.
       var l = window.location
       var path = l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/')
-      var resto = l.pathname.slice(path.length)
       l.replace(
-        path +
-          '/?p=/' +
-          resto.slice(1).replace(/&/g, '~and~') +
-          (l.search ? '&q=' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+        l.protocol +
+          '//' +
+          l.hostname +
+          (l.port ? ':' + l.port : '') +
+          path +
+          '/?/' +
+          l.pathname.slice(path.length + 1).replace(/&/g, '~and~') +
+          (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
           l.hash
       )
     </script>
