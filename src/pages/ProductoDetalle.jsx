@@ -5,6 +5,24 @@ import { formatoPrecio } from '../components/ProductoCard'
 import GaleriaProducto from '../components/GaleriaProducto'
 import { useCart } from '../context/CartContext'
 
+// Orden de las tallas: letras (XS…XXL), luego G10/G12…, luego números, "Única" al final.
+const ORDEN_LETRAS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL']
+function rangoTalla(t) {
+  const s = String(t).trim().toUpperCase()
+  const i = ORDEN_LETRAS.indexOf(s)
+  if (i >= 0) return [0, i]
+  const g = s.match(/^G(\d+)$/)
+  if (g) return [1, Number(g[1])]
+  if (/^\d+$/.test(s)) return [2, Number(s)]
+  if (s === 'ÚNICA' || s === 'UNICA' || s === 'U') return [4, 0]
+  return [3, 0]
+}
+function compararTallas(a, b) {
+  const [ga, va] = rangoTalla(a)
+  const [gb, vb] = rangoTalla(b)
+  return ga - gb || va - vb || String(a).localeCompare(String(b))
+}
+
 export default function ProductoDetalle() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -15,7 +33,10 @@ export default function ProductoDetalle() {
   const variantes = useMemo(() => variantesDe(todasLasVariantes, id), [todasLasVariantes, id])
 
   const colores = useMemo(() => [...new Set(variantes.map((v) => v.color))], [variantes])
-  const tallas = useMemo(() => [...new Set(variantes.map((v) => v.talla))], [variantes])
+  const tallas = useMemo(
+    () => [...new Set(variantes.map((v) => v.talla))].sort(compararTallas),
+    [variantes]
+  )
 
   const [colorSeleccionado, setColorSeleccionado] = useState(null)
   const [tallaSeleccionada, setTallaSeleccionada] = useState(null)
