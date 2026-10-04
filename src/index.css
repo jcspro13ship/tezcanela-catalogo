@@ -469,6 +469,15 @@ main {
     grid-template-columns: 1fr;
   }
 
+  .catalogo-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem 0.75rem;
+  }
+
+  .producto-card h3 {
+    font-size: 0.95rem;
+  }
+
   main {
     padding: 1.5rem 1rem;
   }
