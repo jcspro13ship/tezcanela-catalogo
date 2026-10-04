@@ -14,7 +14,7 @@ export async function llamarAdmin(clave, accion, datos = {}) {
       body: JSON.stringify({ clave, accion, ...datos }),
     })
   } catch {
-    return { ok: false, error: 'No se pudo conectar con el servidor. Revisa tu conexión a internet.' }
+    return { ok: false, error: 'No se pudo conectar con el servidor. Revisa tu conexión a internet. Si es la primera vez, puede que falte activar el panel (actualizar el script).' }
   }
 
   try {
