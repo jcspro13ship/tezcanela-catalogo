@@ -28,6 +28,9 @@ export default function Layout() {
 
       <footer className="footer">
         <p>Tez Canela — Cree · Emprende · Inspira</p>
+        <Link to="/admin" className="footer-admin">
+          Administración
+        </Link>
       </footer>
     </div>
   )

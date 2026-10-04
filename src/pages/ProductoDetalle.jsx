@@ -57,7 +57,7 @@ export default function ProductoDetalle() {
     )
   }
 
-  if (!producto) {
+  if (!producto || !producto.activo) {
     return (
       <div className="pagina-producto">
         <p>Producto no encontrado.</p>

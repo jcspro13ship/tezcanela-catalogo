@@ -5,6 +5,7 @@ import Nosotros from './pages/Nosotros'
 import Catalogo from './pages/Catalogo'
 import ProductoDetalle from './pages/ProductoDetalle'
 import Carrito from './pages/Carrito'
+import Admin from './pages/Admin'
 import { CartProvider } from './context/CartContext'
 import { CatalogoProvider } from './context/CatalogoContext'
 
@@ -19,6 +20,7 @@ export default function App() {
             <Route path="catalogo" element={<Catalogo />} />
             <Route path="producto/:id" element={<ProductoDetalle />} />
             <Route path="carrito" element={<Carrito />} />
+            <Route path="admin" element={<Admin />} />
           </Route>
         </Routes>
       </CartProvider>

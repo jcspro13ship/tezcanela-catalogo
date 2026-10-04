@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { cargarCatalogo } from '../data/fetchCatalogo'
 
 const CatalogoContext = createContext(null)
@@ -21,7 +21,13 @@ export function CatalogoProvider({ children }) {
     }
   }, [])
 
-  return <CatalogoContext.Provider value={estado}>{children}</CatalogoContext.Provider>
+  // Vuelve a leer el catálogo (lo usa el panel de administración tras guardar cambios).
+  const recargar = useCallback(async () => {
+    const data = await cargarCatalogo({ fresco: true })
+    setEstado({ ...data, cargando: false })
+  }, [])
+
+  return <CatalogoContext.Provider value={{ ...estado, recargar }}>{children}</CatalogoContext.Provider>
 }
 
 export function useCatalogo() {

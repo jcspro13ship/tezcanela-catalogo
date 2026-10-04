@@ -173,6 +173,41 @@ Abre la URL que muestra la terminal (por defecto `http://localhost:5173`).
 
 ---
 
+## 8. Panel de administración (/admin)
+
+El sitio incluye un panel para ajustar stock, cambiar precios y ocultar/mostrar productos **sin dar acceso al Google Sheet**. Al estar activo, el Sheet puede quedar privado (solo el propietario).
+
+### Cómo funciona
+
+- El panel está en la ruta `/admin` (enlace discreto "Administración" en el pie de página). No se indexa en buscadores.
+- Escribe en el Sheet a través del Apps Script (`doPost` en `apps-script/Code.gs`). El script corre con la cuenta del propietario, así que funciona aunque el Sheet sea privado.
+- **La clave nunca está en el código del sitio ni en el repositorio** (que es público). Se guarda en las *Propiedades del script* (`ADMIN_CLAVE`) y se valida en el servidor.
+- Protecciones: bloqueo de 10 minutos tras 5 claves incorrectas; validación estricta de cada dato (stock entero ≥ 0, precio numérico, activo booleano); cambios de todo o nada; un ajuste no puede tocar variantes de otro producto; cada cambio queda en la pestaña `Registro` (se crea sola); la caché del catálogo se borra al guardar, así el sitio lee datos frescos.
+- Un producto con `activo = FALSE` no aparece en el catálogo ni se abre por enlace directo.
+
+### Cómo activarlo (una sola vez)
+
+1. Abrir el Google Sheet → **Extensiones → Apps Script**.
+2. Reemplazar **todo** el contenido de `Code.gs` por el de [`apps-script/Code.gs`](../apps-script/Code.gs).
+3. Engranaje **Configuración del proyecto → Propiedades del script → Agregar propiedad**: nombre `ADMIN_CLAVE`, valor = la clave elegida (mínimo 10 caracteres; no escribirla en archivos ni chats).
+4. **Implementar → Gestionar implementaciones →** lápiz **→ Nueva versión → Implementar**. Google pedirá autorizar permisos.
+5. Entrar a `/admin` en el sitio, escribir la clave y probar un ajuste pequeño. Verificar que quedó una fila en la pestaña `Registro`.
+6. Dejar el Google Sheet **privado** (Compartir → quitar a todas las personas excepto el propietario).
+
+Si el panel muestra "falta actualizar el script", el paso 2 o el 4 no se completó. Cambiar la clave: editar la propiedad `ADMIN_CLAVE` (no requiere nueva implementación).
+
+### Pruebas
+
+- `Code.gs` se probó con un simulador de los servicios de Google (11 pruebas: clave ausente, incorrecta y correcta; bloqueo; reinicio del contador; guardado de precio/activo/stock; bitácora y caché; todo o nada; variantes de otro producto; datos inválidos; acciones y JSON inválidos; `doGet` intacto).
+- La interfaz se probó de punta a punta con un simulador del servidor (entrar, clave incorrecta, valores inválidos, editar, guardar, ocultar, enlace directo a producto oculto, sesión y salir), en escritorio y celular.
+- Pendiente tras activarlo: una prueba contra el Sheet real.
+
+### Alcance
+
+El panel **no** crea productos ni sube fotos: eso sigue siendo en el Sheet (productos/variantes/imagenes) y en Cloudinary, por quien administra.
+
+---
+
 ## Resumen de la secuencia completa
 
 1. Levantar inventario real con Fanny (fuera de este documento).
@@ -182,4 +217,5 @@ Abre la URL que muestra la terminal (por defecto `http://localhost:5173`).
 5. Probar en local (paso 4).
 6. Crear repo en GitHub y publicar (paso 5).
 7. Conectar el dominio propio (paso 6).
-8. Capacitar al equipo del cliente con `MANUAL_INVENTARIO.docx`.
+8. Activar el panel de administración y dejar el Sheet privado (sección 8).
+9. Capacitar al equipo del cliente con `MANUAL_INVENTARIO.docx`.
