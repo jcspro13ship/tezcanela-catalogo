@@ -1,5 +1,5 @@
-// TODO: reemplazar por el número real de WhatsApp del negocio (con código de país, sin +, sin espacios)
-export const WHATSAPP_NUMBER = '573000000000'
+// Número de WhatsApp del negocio, con código de país (57 = Colombia), sin + ni espacios
+export const WHATSAPP_NUMBER = '573158401256'
 
 // Apps Script publicado sobre el Google Sheet del inventario (ver docs/INSTRUCTIVO_TECNICO.md).
 // Mientras esté vacío, el sitio usa los datos de ejemplo en src/data/.
