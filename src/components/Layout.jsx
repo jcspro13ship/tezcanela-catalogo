@@ -1,5 +1,6 @@
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
+import { EMPRESA } from '../config'
 
 export default function Layout() {
   const { cantidadTotal } = useCart()
@@ -27,7 +28,9 @@ export default function Layout() {
       </main>
 
       <footer className="footer">
-        <p>Tez Canela — Cree · Emprende · Inspira</p>
+        <p>
+          {EMPRESA.nombre} — {EMPRESA.eslogan}
+        </p>
         <Link to="/admin" className="footer-admin">
           Administración
         </Link>
