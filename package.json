@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && mkdir -p dist/catalogo && cp dist/index.html dist/catalogo/index.html",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist"
   },
