@@ -8,15 +8,11 @@ export default function Layout() {
   return (
     <div className="layout">
       <header className="header">
-        <Link to="/" className="header-logo">
+        <Link to="/catalogo" className="header-logo">
           <img src={`${import.meta.env.BASE_URL}logo-tezcanela.png`} alt="Tez Canela" />
         </Link>
         <nav className="header-nav">
-          <NavLink to="/" end>
-            Inicio
-          </NavLink>
           <NavLink to="/catalogo">Catálogo</NavLink>
-          <NavLink to="/nosotros">Nosotros</NavLink>
           <NavLink to="/carrito" className="header-carrito">
             Carrito{cantidadTotal > 0 ? ` (${cantidadTotal})` : ''}
           </NavLink>
