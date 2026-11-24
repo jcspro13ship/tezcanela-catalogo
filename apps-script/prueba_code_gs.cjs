@@ -43,6 +43,7 @@ function crearEntorno({ clave = CLAVE, conDescuento = false } = {}) {
             },
           },
     appendRow: (fila) => datos[nombre].push(fila),
+    deleteRow: (r) => { datos[nombre].splice(r - 1, 1) },
   })
   const ctx = {
     SpreadsheetApp: {
@@ -241,6 +242,79 @@ prueba('guardarProducto: precio, activo y stock; todo o nada; no toca variantes 
   const antes = t.copia()
   assert.strictEqual(t.admin('guardarProducto', { id: 'r1', precio: 5, stocks: [{ sku: 'R1-NEG-S', stock: 9 }, { sku: 'NO-EXISTE', stock: 1 }] }).ok, false)
   assert.strictEqual(t.admin('guardarProducto', { id: 'r1', stocks: [{ sku: 'R2-ROJ-L', stock: 1 }] }).ok, false)
+  assert.strictEqual(t.copia(), antes)
+})
+
+// ---- editar nombre, descripción y categoría -----------------------------
+prueba('guardarProducto cambia nombre, descripción y categoría (y deja bitácora)', () => {
+  const t = crearEntorno(); t.get()
+  const r = t.admin('guardarProducto', { id: 'r1', nombre: '  Blusa Nueva  ', descripcion: 'Tela suave', categoria: 'Tops' })
+  assert.strictEqual(r.ok, true)
+  assert.deepStrictEqual(t.datos.Productos[1].slice(1, 4), ['Blusa Nueva', 'Tops', 'Tela suave'])
+  assert.strictEqual(t.datos.Productos[2][1], 'Vestido Dos') // otro producto intacto
+  assert.ok(!t.cacheStore['catalogo_json_v1'])
+  assert.match(t.datos.Registro[1][2], /nombre=Blusa Nueva, descripcion, categoria=Tops/)
+  const p = t.get().productos.find((x) => x.id === 'r1')
+  assert.strictEqual(p.nombre, 'Blusa Nueva'); assert.strictEqual(p.descripcion, 'Tela suave')
+})
+prueba('guardarProducto permite dejar la descripción vacía, pero no el nombre ni la categoría', () => {
+  const t = crearEntorno()
+  assert.strictEqual(t.admin('guardarProducto', { id: 'r1', descripcion: '' }).ok, true)
+  assert.strictEqual(t.datos.Productos[1][3], '')
+  const antes = t.copia()
+  for (const mal of [{ nombre: '' }, { nombre: '   ' }, { nombre: 'x'.repeat(121) }, { nombre: 5 }, { categoria: '' }, { categoria: 'x'.repeat(41) }, { descripcion: 'x'.repeat(601) }, { descripcion: 5 }]) {
+    assert.strictEqual(t.admin('guardarProducto', { id: 'r1', ...mal }).ok, false, 'debía rechazar ' + JSON.stringify(mal).slice(0, 40))
+  }
+  assert.strictEqual(t.copia(), antes)
+})
+prueba('guardarProducto: nombre inválido no deja cambios a medias aunque el precio sea válido', () => {
+  const t = crearEntorno(); const antes = t.copia()
+  assert.strictEqual(t.admin('guardarProducto', { id: 'r1', precio: 5, nombre: '' }).ok, false)
+  assert.strictEqual(t.copia(), antes)
+})
+prueba('guardarProducto: textos que parecen fórmula se guardan como texto', () => {
+  const t = crearEntorno()
+  t.admin('guardarProducto', { id: 'r1', nombre: '=1+1', descripcion: '@x' })
+  assert.strictEqual(t.datos.Productos[1][1], "'=1+1"); assert.strictEqual(t.datos.Productos[1][3], "'@x")
+})
+
+// ---- fotos de un producto existente -------------------------------------
+prueba('guardarFotos reemplaza todas las fotos del producto, en orden, sin tocar las de otros', () => {
+  const t = crearEntorno()
+  t.datos.Imagenes.push(['r2', 1, 'http://x/dos.jpg'], ['r1', 2, 'http://x/2.jpg'])
+  t.get()
+  const nuevas = [CLOUD + 'z.jpg', CLOUD + 'y.jpg', CLOUD + 'x.jpg']
+  assert.strictEqual(t.admin('guardarFotos', { id: 'r1', imagenes: nuevas }).ok, true)
+  assert.deepStrictEqual(t.datos.Imagenes.filter((f) => f[0] === 'r1'), [['r1', 1, nuevas[0]], ['r1', 2, nuevas[1]], ['r1', 3, nuevas[2]]])
+  assert.deepStrictEqual(t.datos.Imagenes.filter((f) => f[0] === 'r2'), [['r2', 1, 'http://x/dos.jpg']])
+  assert.ok(!t.cacheStore['catalogo_json_v1'])
+  assert.match(t.datos.Registro[1][2], /r1 \| 3 fotos \(antes 2\)/)
+  assert.deepStrictEqual(t.get().productos.find((p) => p.id === 'r1').imagenes, nuevas)
+})
+prueba('guardarFotos: una lista vacía deja el producto sin fotos; y vacía la columna "imagen" antigua', () => {
+  const t = crearEntorno(); t.datos.Productos[1][5] = 'http://viejo/foto.jpg'
+  assert.strictEqual(t.admin('guardarFotos', { id: 'r1', imagenes: [] }).ok, true)
+  assert.deepStrictEqual(t.get().productos.find((p) => p.id === 'r1').imagenes, [])
+  assert.strictEqual(t.datos.Productos[1][5], '')
+})
+prueba('guardarFotos: agrega fotos a un producto que no tenía ninguna', () => {
+  const t = crearEntorno()
+  assert.strictEqual(t.admin('guardarFotos', { id: 'r2', imagenes: [CLOUD + 'n.jpg'] }).ok, true)
+  assert.deepStrictEqual(t.datos.Imagenes.filter((f) => f[0] === 'r2'), [['r2', 1, CLOUD + 'n.jpg']])
+})
+prueba('guardarFotos: datos inválidos o producto inexistente no cambian nada', () => {
+  const t = crearEntorno(); const antes = t.copia()
+  const casos = [
+    { id: 'r1', imagenes: ['https://evil.example.com/a.jpg'] }, { id: 'r1', imagenes: [CLOUD + 'con espacio.jpg'] },
+    { id: 'r1', imagenes: Array.from({ length: 11 }, (_, i) => CLOUD + i + '.jpg') }, { id: 'r1', imagenes: 'x' }, { id: 'r1' },
+    { id: 'NO-EXISTE', imagenes: [CLOUD + 'a.jpg'] }, { imagenes: [CLOUD + 'a.jpg'] },
+  ]
+  for (const c of casos) assert.strictEqual(t.admin('guardarFotos', c).ok, false, 'debía rechazar ' + JSON.stringify(c).slice(0, 60))
+  assert.strictEqual(t.copia(), antes)
+})
+prueba('guardarFotos exige la clave', () => {
+  const t = crearEntorno(); const antes = t.copia()
+  assert.strictEqual(t.post({ clave: 'mala', accion: 'guardarFotos', id: 'r1', imagenes: [] }).claveIncorrecta, true)
   assert.strictEqual(t.copia(), antes)
 })
 

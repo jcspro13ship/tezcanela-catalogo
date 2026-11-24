@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { llamarAdmin } from '../admin/api'
-import { reducirImagen, subirFoto } from '../admin/cloudinary'
+import { subirPendientes } from '../admin/fotos'
+import EditorFotos from './EditorFotos'
 import { formatoPrecio, precioFinal } from '../utils/precios'
 
 const TALLAS_RAPIDAS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'G10', 'G12', 'G14', 'G16', '2', '4', '6', '8', '10', '12', '14', '16', 'Única']
@@ -64,43 +65,17 @@ export default function NuevoProducto({ clave, productos, categorias, recargar, 
     setTallaOtra('')
   }
 
-  function agregarFotos(e) {
-    const archivos = [...e.target.files].filter((f) => f.type.startsWith('image/'))
-    e.target.value = ''
-    setFotos((f) => [
-      ...f,
-      ...archivos.slice(0, Math.max(0, 10 - f.length)).map((file) => ({
-        key: `${Date.now()}-${Math.random()}`,
-        file,
-        vista: URL.createObjectURL(file),
-        url: null,
-      })),
-    ])
-  }
-
-  const moverFoto = (i, d) =>
-    setFotos((f) => {
-      const j = i + d
-      if (j < 0 || j >= f.length) return f
-      const c = [...f]
-      ;[c[i], c[j]] = [c[j], c[i]]
-      return c
-    })
-  const quitarFoto = (i) => setFotos((f) => f.filter((_, k) => k !== i))
-
   async function crear() {
     setError('')
     setFase('enviando')
-    const lista = [...fotos]
+    let urls
     try {
-      for (let i = 0; i < lista.length; i++) {
-        if (lista[i].url) continue // ya subida en un intento anterior
-        setProgreso(`Subiendo foto ${i + 1} de ${lista.length}…`)
-        const blob = await reducirImagen(lista[i].file)
-        const url = await subirFoto(blob, `tezcanela/${idNuevo}_${Date.now().toString(36)}_${i + 1}`)
-        lista[i] = { ...lista[i], url }
-        setFotos((f) => f.map((x) => (x.key === lista[i].key ? { ...x, url } : x)))
-      }
+      urls = await subirPendientes(
+        fotos,
+        idNuevo,
+        setProgreso,
+        (key, url) => setFotos((f) => f.map((x) => (x.key === key ? { ...x, url } : x)))
+      )
     } catch {
       setProgreso('')
       setFase('editando')
@@ -117,7 +92,7 @@ export default function NuevoProducto({ clave, productos, categorias, recargar, 
       descuento: Number(descuento || 0),
       activo: visible,
       variantes: variantes.map((v) => ({ color: v.color.trim(), talla: v.talla.trim(), stock: Number(v.stock) })),
-      imagenes: lista.map((x) => x.url),
+      imagenes: urls,
     })
     setProgreso('')
     if (!r.ok) {
@@ -291,31 +266,7 @@ export default function NuevoProducto({ clave, productos, categorias, recargar, 
 
       <h3>Fotos</h3>
       <p className="admin-ayuda">La primera es la que se ve en el catálogo. Puedes subir hasta 10 (con modelo, sin modelo, detalles).</p>
-      <div className="admin-fotos">
-        {fotos.map((f, i) => (
-          <div className="admin-foto" key={f.key}>
-            <img src={f.vista} alt="" />
-            {i === 0 && <span className="admin-foto-portada">Portada</span>}
-            <div className="admin-foto-botones">
-              <button type="button" disabled={bloqueado || i === 0} onClick={() => moverFoto(i, -1)} aria-label="Mover antes">
-                ◀
-              </button>
-              <button type="button" disabled={bloqueado || i === fotos.length - 1} onClick={() => moverFoto(i, 1)} aria-label="Mover después">
-                ▶
-              </button>
-              <button type="button" disabled={bloqueado} onClick={() => quitarFoto(i)} aria-label="Quitar foto">
-                ✕
-              </button>
-            </div>
-          </div>
-        ))}
-        {fotos.length < 10 && (
-          <label className="admin-foto-agregar">
-            + Agregar fotos
-            <input type="file" accept="image/*" multiple onChange={agregarFotos} disabled={bloqueado} hidden />
-          </label>
-        )}
-      </div>
+      <EditorFotos fotos={fotos} setFotos={setFotos} bloqueado={bloqueado} />
       {fotos.length === 0 && <p className="admin-ayuda">Sin fotos, el producto aparece con un recuadro gris. Puedes dejarlo oculto hasta tenerlas.</p>}
 
       {problemas.length > 0 && (

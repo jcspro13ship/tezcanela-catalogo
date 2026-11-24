@@ -928,3 +928,32 @@ main {
 .admin-nuevo .admin-variantes-gen .admin-campo > input:not(.admin-talla-otra) {
   width: 100%;
 }
+
+.admin-foto-nueva {
+  position: absolute;
+  top: 0.3rem;
+  right: 0.3rem;
+  background: #b3261e;
+  color: var(--blanco);
+  font-size: 0.7rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+}
+
+.admin-seccion {
+  margin-top: 1.1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--gris-borde);
+}
+
+.admin-seccion h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+}
+
+.admin-detalle .admin-campo input:not([type='checkbox']),
+.admin-detalle .admin-campo select,
+.admin-detalle .admin-campo textarea {
+  width: 100%;
+  max-width: 34rem;
+}

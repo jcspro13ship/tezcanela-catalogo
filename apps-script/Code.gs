@@ -2,7 +2,8 @@
 // 1) doGet: sirve los datos de las hojas "Productos", "Variantes" e "Imagenes" como
 //    JSON, para que el sitio web los lea automáticamente (público, solo lectura).
 // 2) doPost: panel de administración del sitio (/admin). Permite ajustar stock,
-//    precio y descuento, activar/desactivar productos y CREAR productos nuevos
+//    precio y descuento, editar nombre/descripción/categoría/fotos,
+//    activar/desactivar productos y CREAR productos nuevos
 //    SIN dar acceso al Google Sheet.
 //    Exige la clave guardada en Propiedades del script (ADMIN_CLAVE); esa clave
 //    NUNCA se escribe en este archivo (el repositorio de GitHub es público).
@@ -145,6 +146,7 @@ function manejarAdmin_(req) {
   if (req.accion === 'verificar') return { ok: true }
   if (req.accion === 'guardarProducto') return guardarProducto_(req)
   if (req.accion === 'crearProducto') return crearProducto_(req)
+  if (req.accion === 'guardarFotos') return guardarFotos_(req)
   if (req.accion === 'aplicarDescuento') return aplicarDescuento_(req)
   return { ok: false, error: 'Acción no reconocida.' }
 }
@@ -189,11 +191,14 @@ function textoSeguro_(t) {
   return /^[=+\-@]/.test(t) ? "'" + t : t
 }
 
-// req: { id, precio?, descuento?, activo?, stocks?: [{ sku, stock }] }
+// req: { id, nombre?, descripcion?, categoria?, precio?, descuento?, activo?, stocks?: [{ sku, stock }] }
 function guardarProducto_(req) {
   var id = typeof req.id === 'string' ? req.id.trim() : ''
   if (!id) return { ok: false, error: 'Falta el id del producto.' }
 
+  var tieneNombre = req.nombre !== undefined && req.nombre !== null
+  var tieneDescripcion = req.descripcion !== undefined && req.descripcion !== null
+  var tieneCategoria = req.categoria !== undefined && req.categoria !== null
   var tienePrecio = req.precio !== undefined && req.precio !== null
   var tieneDescuento = req.descuento !== undefined && req.descuento !== null
   var tieneActivo = req.activo !== undefined && req.activo !== null
@@ -201,6 +206,15 @@ function guardarProducto_(req) {
 
   if (tienePrecio && !(typeof req.precio === 'number' && isFinite(req.precio) && req.precio >= 0 && req.precio < 100000000)) {
     return { ok: false, error: 'Precio inválido.' }
+  }
+  if (tieneNombre && !(typeof req.nombre === 'string' && req.nombre.trim() && req.nombre.trim().length <= 120)) {
+    return { ok: false, error: 'El nombre es obligatorio (hasta 120 letras).' }
+  }
+  if (tieneCategoria && !(typeof req.categoria === 'string' && req.categoria.trim() && req.categoria.trim().length <= 40)) {
+    return { ok: false, error: 'La categoría es obligatoria (hasta 40 letras).' }
+  }
+  if (tieneDescripcion && !(typeof req.descripcion === 'string' && req.descripcion.trim().length <= 600)) {
+    return { ok: false, error: 'La descripción es muy larga (máximo 600 letras).' }
   }
   if (tieneDescuento && !esEntero_(req.descuento, 0, 90)) {
     return { ok: false, error: 'Descuento inválido (debe ser un número entero entre 0 y 90).' }
@@ -213,7 +227,7 @@ function guardarProducto_(req) {
       return { ok: false, error: 'Stock inválido (debe ser un número entero de 0 o más).' }
     }
   }
-  if (!tienePrecio && !tieneDescuento && !tieneActivo && stocks.length === 0) return { ok: false, error: 'No hay cambios para guardar.' }
+  if (!tieneNombre && !tieneDescripcion && !tieneCategoria && !tienePrecio && !tieneDescuento && !tieneActivo && stocks.length === 0) return { ok: false, error: 'No hay cambios para guardar.' }
 
   var lock = LockService.getScriptLock()
   lock.waitLock(20000)
@@ -236,6 +250,18 @@ function guardarProducto_(req) {
 
     // Todo validado: recién ahora se escribe.
     var detalle = []
+    if (tieneNombre) {
+      productos.sheet.getRange(filaProd, productos.col['nombre'] + 1).setValue(textoSeguro_(req.nombre.trim()))
+      detalle.push('nombre=' + req.nombre.trim())
+    }
+    if (tieneDescripcion) {
+      productos.sheet.getRange(filaProd, productos.col['descripcion'] + 1).setValue(textoSeguro_(req.descripcion.trim()))
+      detalle.push('descripcion')
+    }
+    if (tieneCategoria) {
+      productos.sheet.getRange(filaProd, productos.col['categoria'] + 1).setValue(textoSeguro_(req.categoria.trim()))
+      detalle.push('categoria=' + req.categoria.trim())
+    }
     if (tienePrecio) {
       productos.sheet.getRange(filaProd, productos.col['precio'] + 1).setValue(req.precio)
       detalle.push('precio=' + req.precio)
@@ -300,6 +326,70 @@ function aplicarDescuento_(req) {
 
 var CLOUDINARY_PREFIJO = 'https://res.cloudinary.com/sa0ainfh/image/upload/'
 
+// Devuelve un mensaje de error, o '' si la lista de fotos es válida.
+function validarFotos_(fotos) {
+  if (fotos.length > 10) return 'Máximo 10 fotos por producto.'
+  for (var f = 0; f < fotos.length; f++) {
+    if (typeof fotos[f] !== 'string' || fotos[f].indexOf(CLOUDINARY_PREFIJO) !== 0 || fotos[f].length > 400 || /\s/.test(fotos[f])) {
+      return 'Una de las fotos no es válida.'
+    }
+  }
+  return ''
+}
+
+// Reemplaza TODAS las fotos de un producto por la lista indicada (en ese orden;
+// la primera es la portada). Una lista vacía deja el producto sin fotos.
+// req: { id, imagenes: [url de Cloudinary] }
+function guardarFotos_(req) {
+  var id = typeof req.id === 'string' ? req.id.trim() : ''
+  if (!id) return { ok: false, error: 'Falta el id del producto.' }
+  if (!Array.isArray(req.imagenes)) return { ok: false, error: 'Falta la lista de fotos.' }
+  var errorFotos = validarFotos_(req.imagenes)
+  if (errorFotos) return { ok: false, error: errorFotos }
+
+  var lock = LockService.getScriptLock()
+  lock.waitLock(20000)
+  try {
+    var productos = leerHoja_('Productos')
+    var filaProd = buscarFila_(productos, 'id', id)
+    if (filaProd < 0) return { ok: false, error: 'No se encontró el producto "' + id + '".' }
+    var imagenes = leerHoja_('Imagenes')
+    var cId = imagenes.col['producto_id']
+    if (cId === undefined) return { ok: false, error: 'Falta la columna "producto_id" en Imagenes.' }
+
+    // Todo validado: recién ahora se escribe. Primero se borran las filas viejas
+    // (de abajo hacia arriba, para que los números de fila no se corran).
+    var filasViejas = []
+    for (var i = 1; i < imagenes.valores.length; i++) {
+      if (String(imagenes.valores[i][cId]) === id) filasViejas.push(i + 1)
+    }
+    for (var k = filasViejas.length - 1; k >= 0; k--) imagenes.sheet.deleteRow(filasViejas[k])
+
+    if (req.imagenes.length) {
+      var filas = req.imagenes.map(function (u, n) {
+        var fila = []
+        for (var c = 0; c < imagenes.valores[0].length; c++) {
+          var h = String(imagenes.valores[0][c])
+          fila.push(h === 'producto_id' ? id : h === 'orden' ? n + 1 : h === 'url' ? u : '')
+        }
+        return fila
+      })
+      var primera = imagenes.sheet.getLastRow() + 1
+      imagenes.sheet.getRange(primera, 1, filas.length, filas[0].length).setValues(filas)
+    }
+    // Si el producto usaba la columna "imagen" (formato antiguo), se vacía para que no reaparezca.
+    if (productos.col['imagen'] !== undefined) {
+      productos.sheet.getRange(filaProd, productos.col['imagen'] + 1).setValue('')
+    }
+
+    registrar_('guardarFotos', id + ' | ' + req.imagenes.length + ' fotos (antes ' + filasViejas.length + ')')
+    CacheService.getScriptCache().remove(CACHE_KEY)
+    return { ok: true }
+  } finally {
+    lock.releaseLock()
+  }
+}
+
 function sinTildes_(t) {
   return String(t).normalize('NFD').replace(/[̀-ͯ]/g, '')
 }
@@ -343,12 +433,8 @@ function crearProducto_(req) {
   }
 
   var fotos = Array.isArray(req.imagenes) ? req.imagenes : []
-  if (fotos.length > 10) return { ok: false, error: 'Máximo 10 fotos por producto.' }
-  for (var f = 0; f < fotos.length; f++) {
-    if (typeof fotos[f] !== 'string' || fotos[f].indexOf(CLOUDINARY_PREFIJO) !== 0 || fotos[f].length > 400 || /\s/.test(fotos[f])) {
-      return { ok: false, error: 'Una de las fotos no es válida.' }
-    }
-  }
+  var errorFotos = validarFotos_(fotos)
+  if (errorFotos) return { ok: false, error: errorFotos }
 
   var lock = LockService.getScriptLock()
   lock.waitLock(20000)

@@ -176,7 +176,7 @@ Abre la URL que muestra la terminal (por defecto `http://localhost:5173`).
 
 ## 8. Panel de administración (/admin)
 
-El sitio incluye un panel para **crear productos, ajustar stock, precios y descuentos, y ocultar/mostrar productos** sin dar acceso al Google Sheet. Al estar activo, el Sheet puede quedar privado (solo el propietario).
+El sitio incluye un panel para **crear productos, editar sus datos y fotos, ajustar stock, precios y descuentos, y ocultar/mostrar productos** sin dar acceso al Google Sheet. Al estar activo, el Sheet puede quedar privado (solo el propietario).
 
 ### Qué permite hacer
 
@@ -184,6 +184,8 @@ El sitio incluye un panel para **crear productos, ajustar stock, precios y descu
 |---|---|
 | Ajustar stock por talla y color | Fila del producto → **Editar** |
 | Cambiar precio | Fila del producto → **Editar** |
+| **Editar nombre, categoría y descripción** | Fila del producto → **Editar** |
+| **Agregar, quitar y reordenar fotos** (la primera es la portada) | Fila del producto → **Editar** → Fotos → **Guardar fotos** |
 | Descuento de un producto (0–90 %) | Fila del producto → **Editar** → Descuento |
 | Descuento a toda una categoría o al catálogo | Botón **Descuentos por categoría** |
 | Ocultar o mostrar un producto | Interruptor *Visible/Oculto* de la fila |
@@ -191,6 +193,8 @@ El sitio incluye un panel para **crear productos, ajustar stock, precios y descu
 | **Compartir** un producto con un cliente | Botón **Compartir** de la fila (y de la ficha del producto) |
 
 **Descuentos.** El producto muestra una franja roja con el porcentaje (`-20%`) sobre la foto, el precio nuevo y el precio anterior tachado. El carrito y el mensaje de WhatsApp usan el precio con descuento. El precio final se redondea a la decena (ej. 289.990 − 15 % = 246.490).
+
+**Editar un producto existente.** En **Editar** se cambian nombre, categoría, descripción, precio, descuento y stock con **Guardar cambios**, y las fotos con **Guardar fotos** (botones separados). Las fotos nuevas se reducen y se suben igual que al crear un producto; guardar reemplaza la lista completa de fotos del producto (en el orden mostrado). Si se quitan todas, el producto queda con un recuadro gris.
 
 **Producto nuevo.** Se piden referencia (de ahí sale el código interno `r` + referencia en minúsculas), nombre, categoría, precio, descuento, descripción, tallas y colores con su cantidad, y hasta 10 fotos (la primera es la portada). Las fotos se reducen en el navegador (lado mayor 1600 px) y se suben a Cloudinary con el preset sin firma `tezcanela_catalogo`; el script solo acepta direcciones de fotos de esa cuenta de Cloudinary. El script crea una fila en `Productos`, una por talla/color en `Variantes` (SKU `REF-COL-TALLA`) y una por foto en `Imagenes`. No permite repetir una referencia.
 
@@ -201,7 +205,7 @@ El sitio incluye un panel para **crear productos, ajustar stock, precios y descu
 - El panel está en la ruta `/admin` (enlace discreto "Administración" en el pie de página). No se indexa en buscadores.
 - Escribe en el Sheet a través del Apps Script (`doPost` en `apps-script/Code.gs`). El script corre con la cuenta del propietario, así que funciona aunque el Sheet sea privado.
 - **La clave nunca está en el código del sitio ni en el repositorio** (que es público). Se guarda en las *Propiedades del script* (`ADMIN_CLAVE`) y se valida en el servidor.
-- Acciones del script: `verificar`, `guardarProducto` (precio, descuento, activo, stock), `aplicarDescuento` (categoría o todo) y `crearProducto`.
+- Acciones del script: `verificar`, `guardarProducto` (nombre, descripción, categoría, precio, descuento, activo, stock), `guardarFotos` (reemplaza las fotos de un producto), `aplicarDescuento` (categoría o todo) y `crearProducto`.
 - Protecciones: bloqueo de 10 minutos tras 5 claves incorrectas; validación estricta de cada dato; cambios de todo o nada; textos que empiezan con `= + - @` se guardan como texto (no como fórmula); un ajuste no puede tocar variantes de otro producto; cada cambio queda en la pestaña `Registro` (se crea sola); la caché del catálogo se borra al guardar.
 - Un producto con `activo = FALSO` no aparece en el catálogo ni se abre por enlace directo.
 
@@ -218,8 +222,8 @@ Si el panel dice "El script de Google todavía no tiene esta función", falta el
 
 ### Pruebas
 
-- `node apps-script/prueba_code_gs.cjs` prueba `Code.gs` con un simulador de los servicios de Google (18 pruebas: acceso y bloqueo; descuento por producto y por categoría; creación de productos —columnas, SKU únicos, referencia repetida, 28 tipos de datos inválidos sin escribir nada, fórmulas, columnas reordenadas—; precio/activo/stock; todo o nada).
-- La interfaz se probó de punta a punta contra el `Code.gs` real con hojas simuladas: entrar, descuento de un producto y de una categoría, franja y precio tachado en el catálogo y la ficha, precio con descuento en el carrito, crear un producto con fotos, menú de compartir y apertura del enlace compartido.
+- `node apps-script/prueba_code_gs.cjs` prueba `Code.gs` con un simulador de los servicios de Google (27 pruebas: acceso y bloqueo; descuento por producto y por categoría; edición de nombre/descripción/categoría; reemplazo de fotos; creación de productos —columnas, SKU únicos, referencia repetida, 28 tipos de datos inválidos sin escribir nada, fórmulas, columnas reordenadas—; precio/activo/stock; todo o nada).
+- La interfaz se probó de punta a punta contra el `Code.gs` real con hojas simuladas: entrar, descuento de un producto y de una categoría, franja y precio tachado en el catálogo y la ficha, precio con descuento en el carrito, crear un producto con fotos, editar nombre/categoría/descripción y fotos de un producto existente (agregar, quitar, reordenar), menú de compartir y apertura del enlace compartido.
 - Pendiente tras activarlo: una prueba contra el Sheet real y desde un celular.
 
 ### Importante: ya no se vuelven a importar los CSV

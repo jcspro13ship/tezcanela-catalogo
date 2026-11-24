@@ -5,6 +5,8 @@ import { llamarAdmin } from '../admin/api'
 import { conAncho } from '../utils/imagenUrl'
 import BotonCompartir from '../components/BotonCompartir'
 import NuevoProducto from './NuevoProducto'
+import EditorFotos from './EditorFotos'
+import { subirPendientes } from '../admin/fotos'
 
 const CLAVE_SS = 'tc_admin_clave'
 const POR_PAGINA = 30
@@ -204,6 +206,7 @@ function Panel({ clave, onSalir }) {
             <ProductoFila
               key={p.id}
               producto={p}
+              categorias={categorias}
               variantes={variantesDe(variantes, p.id)}
               clave={clave}
               recargar={recargar}
@@ -223,6 +226,7 @@ function Panel({ clave, onSalir }) {
   )
 }
 
+const OTRA = '__otra__'
 const entero = (t) => /^\d+$/.test(String(t).trim())
 const descuentoValido = (t) => entero(t) && Number(t) <= 90
 
@@ -294,10 +298,18 @@ function DescuentosPorCategoria({ clave, productos, categorias, recargar, onSali
   )
 }
 
-function ProductoFila({ producto, variantes, clave, recargar, onSalir }) {
+function ProductoFila({ producto, categorias, variantes, clave, recargar, onSalir }) {
   const [abierto, setAbierto] = useState(false)
   const [precio, setPrecio] = useState(String(producto.precio))
   const [descuento, setDescuento] = useState(String(porcentajeDescuento(producto)))
+  const [nombre, setNombre] = useState(producto.nombre)
+  const [descripcion, setDescripcion] = useState(producto.descripcion || '')
+  const [categoria, setCategoria] = useState(producto.categoria)
+  const [categoriaNueva, setCategoriaNueva] = useState('')
+  const [fotos, setFotos] = useState(() =>
+    producto.imagenes.map((url, i) => ({ key: `${url}-${i}`, url, vista: conAncho(url, 300) }))
+  )
+  const [subiendo, setSubiendo] = useState('')
   const [stocks, setStocks] = useState(() => Object.fromEntries(variantes.map((v) => [v.sku, String(v.stock)])))
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState(null)
@@ -306,9 +318,22 @@ function ProductoFila({ producto, variantes, clave, recargar, onSalir }) {
   const precioCambio = precio.trim() !== String(producto.precio)
   const descuentoActual = porcentajeDescuento(producto)
   const descuentoCambio = descuento.trim() !== String(descuentoActual)
+  const categoriaFinal = categoria === OTRA ? categoriaNueva.trim() : categoria
+  const nombreCambio = nombre.trim() !== producto.nombre
+  const descripcionCambio = descripcion.trim() !== (producto.descripcion || '').trim()
+  const categoriaCambio = categoriaFinal !== producto.categoria
+  const fotosCambiaron =
+    fotos.length !== producto.imagenes.length || fotos.some((f, i) => f.url !== producto.imagenes[i])
   const stocksCambiados = variantes.filter((v) => (stocks[v.sku] ?? String(v.stock)).trim() !== String(v.stock))
-  const hayCambios = precioCambio || descuentoCambio || stocksCambiados.length > 0
-  const valido = entero(precio) && descuentoValido(descuento) && variantes.every((v) => entero(stocks[v.sku] ?? v.stock))
+  const hayCambios = precioCambio || descuentoCambio || nombreCambio || descripcionCambio || categoriaCambio || stocksCambiados.length > 0
+  const valido =
+    entero(precio) &&
+    descuentoValido(descuento) &&
+    nombre.trim().length > 0 &&
+    nombre.trim().length <= 120 &&
+    categoriaFinal.length > 0 &&
+    descripcion.trim().length <= 600 &&
+    variantes.every((v) => entero(stocks[v.sku] ?? v.stock))
 
   async function enviar(cambios, textoOk) {
     setGuardando(true)
@@ -331,6 +356,9 @@ function ProductoFila({ producto, variantes, clave, recargar, onSalir }) {
   const guardar = () =>
     enviar(
       {
+        ...(nombreCambio ? { nombre: nombre.trim() } : {}),
+        ...(descripcionCambio ? { descripcion: descripcion.trim() } : {}),
+        ...(categoriaCambio ? { categoria: categoriaFinal } : {}),
         ...(precioCambio ? { precio: Number(precio) } : {}),
         ...(descuentoCambio ? { descuento: Number(descuento) } : {}),
         ...(stocksCambiados.length
@@ -339,6 +367,39 @@ function ProductoFila({ producto, variantes, clave, recargar, onSalir }) {
       },
       'Cambios guardados'
     )
+
+  async function guardarFotos() {
+    setGuardando(true)
+    setMensaje(null)
+    let urls
+    try {
+      urls = await subirPendientes(
+        fotos,
+        producto.id,
+        setSubiendo,
+        (key, url) => setFotos((f) => f.map((x) => (x.key === key ? { ...x, url } : x)))
+      )
+    } catch {
+      setSubiendo('')
+      setGuardando(false)
+      return setMensaje({ tipo: 'error', texto: 'No se pudo subir una foto. Revisa tu conexión e inténtalo de nuevo (las que ya subieron no se repiten).' })
+    }
+    setSubiendo('Guardando…')
+    const r = await llamarAdmin(clave, 'guardarFotos', { id: producto.id, imagenes: urls })
+    setSubiendo('')
+    if (!r.ok) {
+      setGuardando(false)
+      if (r.claveIncorrecta || r.bloqueado) return onSalir(r.error)
+      return setMensaje({ tipo: 'error', texto: r.error || 'No se pudieron guardar las fotos.' })
+    }
+    try {
+      await recargar()
+      setMensaje({ tipo: 'ok', texto: 'Fotos guardadas' })
+    } catch {
+      setMensaje({ tipo: 'ok', texto: 'Fotos guardadas (recarga la página para verlas)' })
+    }
+    setGuardando(false)
+  }
 
   const cambiarActivo = () =>
     enviar({ activo: !producto.activo }, producto.activo ? 'Producto oculto del catálogo' : 'Producto visible en el catálogo')
@@ -376,6 +437,30 @@ function ProductoFila({ producto, variantes, clave, recargar, onSalir }) {
 
       {abierto && (
         <div className="admin-detalle">
+          <label className="admin-campo">
+            Nombre
+            <input value={nombre} maxLength={120} onChange={(e) => setNombre(e.target.value)} className={nombre.trim() ? '' : 'admin-invalido'} />
+          </label>
+          <div className="admin-grid2">
+            <label className="admin-campo">
+              Categoría
+              <select value={categoria} onChange={(e) => setCategoria(e.target.value)}>
+                {categorias.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+                <option value={OTRA}>Otra categoría…</option>
+              </select>
+              {categoria === OTRA && (
+                <input value={categoriaNueva} onChange={(e) => setCategoriaNueva(e.target.value)} placeholder="Nombre de la categoría (en plural)" />
+              )}
+            </label>
+          </div>
+          <label className="admin-campo">
+            Descripción
+            <textarea rows={3} value={descripcion} maxLength={600} onChange={(e) => setDescripcion(e.target.value)} />
+          </label>
           <div className="admin-grid2">
             <label className="admin-campo">
               Precio (COP)
@@ -437,6 +522,18 @@ function ProductoFila({ producto, variantes, clave, recargar, onSalir }) {
             <button className="boton boton-primario" onClick={guardar} disabled={!hayCambios || !valido || guardando}>
               {guardando ? 'Guardando…' : 'Guardar cambios'}
             </button>
+          </div>
+
+          <div className="admin-seccion">
+            <h3>Fotos</h3>
+            <p className="admin-ayuda">La primera es la que se ve en el catálogo. Puedes agregar, quitar y reordenar; hasta 10 fotos.</p>
+            <EditorFotos fotos={fotos} setFotos={setFotos} bloqueado={guardando} />
+            {subiendo && <p className="admin-estado">{subiendo}</p>}
+            <div className="admin-acciones">
+              <button className="boton boton-primario" onClick={guardarFotos} disabled={!fotosCambiaron || guardando}>
+                {guardando && subiendo ? 'Guardando fotos…' : 'Guardar fotos'}
+              </button>
+            </div>
           </div>
         </div>
       )}
