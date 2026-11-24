@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import Catalogo from './pages/Catalogo'
 import ProductoDetalle from './pages/ProductoDetalle'
@@ -38,8 +38,20 @@ function useActualizacionAutomatica() {
   }, [])
 }
 
+// Enlaces compartidos: .../catalogo/?ver=ID abren directamente la ficha de ese producto.
+function useEnlaceDeProducto() {
+  const navigate = useNavigate()
+  useEffect(() => {
+    const ver = new URLSearchParams(window.location.search).get('ver')
+    if (ver) navigate(`/producto/${encodeURIComponent(ver)}`, { replace: true })
+    // solo al abrir la app
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+}
+
 export default function App() {
   useActualizacionAutomatica()
+  useEnlaceDeProducto()
   return (
     <CatalogoProvider>
       <CartProvider>

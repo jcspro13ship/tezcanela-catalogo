@@ -18,7 +18,14 @@ export async function llamarAdmin(clave, accion, datos = {}) {
   }
 
   try {
-    return await res.json()
+    const r = await res.json()
+    if (r && r.ok === false && r.error === 'Acción no reconocida.') {
+      return {
+        ok: false,
+        error: 'El script de Google todavía no tiene esta función. Hay que actualizar el código del script (ver el instructivo) y publicar una versión nueva.',
+      }
+    }
+    return r
   } catch {
     return {
       ok: false,

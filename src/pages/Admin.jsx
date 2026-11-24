@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useCatalogo, variantesDe } from '../context/CatalogoContext'
-import { formatoPrecio } from '../components/ProductoCard'
+import { formatoPrecio, porcentajeDescuento, precioFinal } from '../utils/precios'
 import { llamarAdmin } from '../admin/api'
 import { conAncho } from '../utils/imagenUrl'
+import BotonCompartir from '../components/BotonCompartir'
+import NuevoProducto from './NuevoProducto'
 
 const CLAVE_SS = 'tc_admin_clave'
 const POR_PAGINA = 30
@@ -104,6 +106,9 @@ function Panel({ clave, onSalir }) {
   const [busqueda, setBusqueda] = useState('')
   const [estado, setEstado] = useState('todos')
   const [visibles, setVisibles] = useState(POR_PAGINA)
+  const [herramienta, setHerramienta] = useState(null) // null | 'nuevo' | 'descuentos'
+
+  const categorias = useMemo(() => [...new Set(productos.map((p) => p.categoria))].sort(), [productos])
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
@@ -118,6 +123,7 @@ function Panel({ clave, onSalir }) {
   useEffect(() => setVisibles(POR_PAGINA), [busqueda, estado])
 
   const activos = productos.filter((p) => p.activo).length
+  const conDescuento = productos.filter((p) => porcentajeDescuento(p) > 0).length
 
   return (
     <div className="admin">
@@ -126,12 +132,42 @@ function Panel({ clave, onSalir }) {
           <h1>Administración</h1>
           <p className="admin-resumen">
             {productos.length} productos · {activos} visibles · {productos.length - activos} ocultos
+            {conDescuento > 0 && ` · ${conDescuento} con descuento`}
           </p>
         </div>
         <button className="boton boton-secundario" onClick={() => onSalir()}>
           Salir
         </button>
       </div>
+
+      <div className="admin-herramientas">
+        <button
+          className={`chip ${herramienta === 'nuevo' ? 'chip-activo' : ''}`}
+          onClick={() => setHerramienta((h) => (h === 'nuevo' ? null : 'nuevo'))}
+        >
+          + Nuevo producto
+        </button>
+        <button
+          className={`chip ${herramienta === 'descuentos' ? 'chip-activo' : ''}`}
+          onClick={() => setHerramienta((h) => (h === 'descuentos' ? null : 'descuentos'))}
+        >
+          Descuentos por categoría
+        </button>
+      </div>
+
+      {herramienta === 'nuevo' && (
+        <NuevoProducto
+          clave={clave}
+          productos={productos}
+          categorias={categorias}
+          recargar={recargar}
+          onSalir={onSalir}
+          onCerrar={() => setHerramienta(null)}
+        />
+      )}
+      {herramienta === 'descuentos' && (
+        <DescuentosPorCategoria clave={clave} productos={productos} categorias={categorias} recargar={recargar} onSalir={onSalir} />
+      )}
 
       <div className="admin-filtros">
         <input
@@ -188,19 +224,91 @@ function Panel({ clave, onSalir }) {
 }
 
 const entero = (t) => /^\d+$/.test(String(t).trim())
+const descuentoValido = (t) => entero(t) && Number(t) <= 90
+
+function DescuentosPorCategoria({ clave, productos, categorias, recargar, onSalir }) {
+  const [categoria, setCategoria] = useState('')
+  const [porcentaje, setPorcentaje] = useState('')
+  const [trabajando, setTrabajando] = useState(false)
+  const [mensaje, setMensaje] = useState(null)
+
+  const afectados = productos.filter((p) => !categoria || p.categoria === categoria).length
+  const donde = categoria ? `la categoría ${categoria}` : 'TODO el catálogo'
+
+  async function aplicar(valor) {
+    const texto =
+      valor === 0
+        ? `¿Quitar el descuento a ${afectados} productos de ${donde}?`
+        : `¿Aplicar ${valor}% de descuento a ${afectados} productos de ${donde}? Reemplaza el descuento que tengan ahora.`
+    if (!window.confirm(texto)) return
+    setTrabajando(true)
+    setMensaje(null)
+    const r = await llamarAdmin(clave, 'aplicarDescuento', { descuento: valor, ...(categoria ? { categoria } : {}) })
+    if (!r.ok) {
+      setTrabajando(false)
+      if (r.claveIncorrecta || r.bloqueado) return onSalir(r.error)
+      return setMensaje({ tipo: 'error', texto: r.error || 'No se pudo aplicar.' })
+    }
+    try {
+      await recargar()
+      setMensaje({ tipo: 'ok', texto: valor === 0 ? `Descuento quitado en ${r.productos} productos.` : `${valor}% aplicado a ${r.productos} productos.` })
+    } catch {
+      setMensaje({ tipo: 'ok', texto: 'Listo (recarga la página para verlo).' })
+    }
+    setTrabajando(false)
+  }
+
+  return (
+    <div className="admin-nuevo">
+      <h2>Descuentos por categoría</h2>
+      <p className="admin-ayuda">
+        Para un solo producto, usa «Editar» en su fila. Aquí puedes poner el mismo descuento a toda una categoría (o a todo el catálogo) de una vez.
+      </p>
+      <div className="admin-grid2">
+        <label className="admin-campo">
+          ¿A qué productos?
+          <select value={categoria} onChange={(e) => setCategoria(e.target.value)} disabled={trabajando}>
+            <option value="">Todo el catálogo</option>
+            {categorias.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="admin-campo">
+          Descuento (%)
+          <input inputMode="numeric" value={porcentaje} onChange={(e) => setPorcentaje(e.target.value)} placeholder="Ej: 20" disabled={trabajando} className={!porcentaje || descuentoValido(porcentaje) ? '' : 'admin-invalido'} />
+        </label>
+      </div>
+      <div className="admin-acciones">
+        <button className="chip" onClick={() => aplicar(0)} disabled={trabajando || afectados === 0}>
+          Quitar descuentos
+        </button>
+        <button className="boton boton-primario" onClick={() => aplicar(Number(porcentaje))} disabled={trabajando || !descuentoValido(porcentaje) || Number(porcentaje) < 1 || afectados === 0}>
+          {trabajando ? 'Aplicando…' : `Aplicar a ${afectados} productos`}
+        </button>
+      </div>
+      {mensaje && <p className={mensaje.tipo === 'ok' ? 'admin-ok' : 'checkout-error'}>{mensaje.texto}</p>}
+    </div>
+  )
+}
 
 function ProductoFila({ producto, variantes, clave, recargar, onSalir }) {
   const [abierto, setAbierto] = useState(false)
   const [precio, setPrecio] = useState(String(producto.precio))
+  const [descuento, setDescuento] = useState(String(porcentajeDescuento(producto)))
   const [stocks, setStocks] = useState(() => Object.fromEntries(variantes.map((v) => [v.sku, String(v.stock)])))
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState(null)
 
   const stockTotal = variantes.reduce((a, v) => a + v.stock, 0)
   const precioCambio = precio.trim() !== String(producto.precio)
+  const descuentoActual = porcentajeDescuento(producto)
+  const descuentoCambio = descuento.trim() !== String(descuentoActual)
   const stocksCambiados = variantes.filter((v) => (stocks[v.sku] ?? String(v.stock)).trim() !== String(v.stock))
-  const hayCambios = precioCambio || stocksCambiados.length > 0
-  const valido = entero(precio) && variantes.every((v) => entero(stocks[v.sku] ?? v.stock))
+  const hayCambios = precioCambio || descuentoCambio || stocksCambiados.length > 0
+  const valido = entero(precio) && descuentoValido(descuento) && variantes.every((v) => entero(stocks[v.sku] ?? v.stock))
 
   async function enviar(cambios, textoOk) {
     setGuardando(true)
@@ -224,6 +332,7 @@ function ProductoFila({ producto, variantes, clave, recargar, onSalir }) {
     enviar(
       {
         ...(precioCambio ? { precio: Number(precio) } : {}),
+        ...(descuentoCambio ? { descuento: Number(descuento) } : {}),
         ...(stocksCambiados.length
           ? { stocks: stocksCambiados.map((v) => ({ sku: v.sku, stock: Number(stocks[v.sku]) })) }
           : {}),
@@ -243,7 +352,15 @@ function ProductoFila({ producto, variantes, clave, recargar, onSalir }) {
         <div className="admin-fila-info">
           <p className="admin-fila-nombre">{producto.nombre}</p>
           <p className="admin-fila-meta">
-            {producto.id} · {producto.categoria} · {formatoPrecio(producto.precio)} ·{' '}
+            {producto.id} · {producto.categoria} ·{' '}
+            {descuentoActual > 0 ? (
+              <>
+                <strong>{formatoPrecio(precioFinal(producto))}</strong> <s>{formatoPrecio(producto.precio)}</s> (-{descuentoActual}%)
+              </>
+            ) : (
+              formatoPrecio(producto.precio)
+            )}{' '}
+            ·{' '}
             {stockTotal === 0 ? <strong>Agotado</strong> : `${stockTotal} en stock`}
           </p>
         </div>
@@ -251,6 +368,7 @@ function ProductoFila({ producto, variantes, clave, recargar, onSalir }) {
           <input type="checkbox" checked={producto.activo} disabled={guardando} onChange={cambiarActivo} />
           <span>{producto.activo ? 'Visible' : 'Oculto'}</span>
         </label>
+        <BotonCompartir producto={producto} className="chip" />
         <button className="chip" onClick={() => setAbierto((a) => !a)}>
           {abierto ? 'Cerrar' : 'Editar'}
         </button>
@@ -258,15 +376,29 @@ function ProductoFila({ producto, variantes, clave, recargar, onSalir }) {
 
       {abierto && (
         <div className="admin-detalle">
-          <label className="admin-campo">
-            Precio (COP)
-            <input
-              inputMode="numeric"
-              value={precio}
-              onChange={(e) => setPrecio(e.target.value)}
-              className={entero(precio) ? '' : 'admin-invalido'}
-            />
-          </label>
+          <div className="admin-grid2">
+            <label className="admin-campo">
+              Precio (COP)
+              <input
+                inputMode="numeric"
+                value={precio}
+                onChange={(e) => setPrecio(e.target.value)}
+                className={entero(precio) ? '' : 'admin-invalido'}
+              />
+            </label>
+            <label className="admin-campo">
+              Descuento (%) — 0 para quitarlo
+              <input
+                inputMode="numeric"
+                value={descuento}
+                onChange={(e) => setDescuento(e.target.value)}
+                className={descuentoValido(descuento) ? '' : 'admin-invalido'}
+              />
+              {descuentoValido(descuento) && entero(precio) && Number(descuento) > 0 && (
+                <small>Se venderá en {formatoPrecio(precioFinal({ precio: Number(precio), descuento: Number(descuento) }))}</small>
+              )}
+            </label>
+          </div>
 
           <table className="admin-variantes">
             <thead>

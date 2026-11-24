@@ -35,14 +35,15 @@ Si en algún momento prefieres armar la estructura desde cero en vez de importar
 
 ### Pestaña `Productos`
 
-| id | nombre | categoria | descripcion | precio | imagen | activo |
-|----|--------|-----------|-------------|--------|--------|--------|
-| p1 | Vestido Amelia | Vestidos | Vestido midi de manga larga... | 189000 | (vacío o URL de foto) | VERDADERO |
+| id | nombre | categoria | descripcion | precio | imagen | activo | descuento |
+|----|--------|-----------|-------------|--------|--------|--------|-----------|
+| p1 | Vestido Amelia | Vestidos | Vestido midi de manga larga... | 189000 | (vacío o URL de foto) | VERDADERO | 0 |
 
 - `id`: identificador único y corto, sin espacios (p1, p2, p3...).
 - `precio`: número sin puntos ni signo de pesos (ej. `189000`).
 - `imagen`: se puede dejar vacío mientras no haya fotos; el sitio muestra un placeholder con el nombre del producto. Cuando haya foto, pegar ahí la URL pública de la imagen.
 - `activo`: `VERDADERO` para que aparezca en el catálogo, `FALSO` para ocultarlo sin borrar la fila.
+- `descuento`: porcentaje entero de 0 a 90 (vacío o 0 = sin descuento). La columna se crea sola la primera vez que se aplica un descuento desde el panel; **no hace falta crearla a mano**. Si se vuelve a importar un CSV de Productos que no la tenga, se pierden los descuentos.
 
 ### Pestaña `Variantes`
 
@@ -175,36 +176,55 @@ Abre la URL que muestra la terminal (por defecto `http://localhost:5173`).
 
 ## 8. Panel de administración (/admin)
 
-El sitio incluye un panel para ajustar stock, cambiar precios y ocultar/mostrar productos **sin dar acceso al Google Sheet**. Al estar activo, el Sheet puede quedar privado (solo el propietario).
+El sitio incluye un panel para **crear productos, ajustar stock, precios y descuentos, y ocultar/mostrar productos** sin dar acceso al Google Sheet. Al estar activo, el Sheet puede quedar privado (solo el propietario).
+
+### Qué permite hacer
+
+| Función | Dónde |
+|---|---|
+| Ajustar stock por talla y color | Fila del producto → **Editar** |
+| Cambiar precio | Fila del producto → **Editar** |
+| Descuento de un producto (0–90 %) | Fila del producto → **Editar** → Descuento |
+| Descuento a toda una categoría o al catálogo | Botón **Descuentos por categoría** |
+| Ocultar o mostrar un producto | Interruptor *Visible/Oculto* de la fila |
+| **Crear un producto nuevo** (datos, tallas y colores, fotos) | Botón **+ Nuevo producto** |
+| **Compartir** un producto con un cliente | Botón **Compartir** de la fila (y de la ficha del producto) |
+
+**Descuentos.** El producto muestra una franja roja con el porcentaje (`-20%`) sobre la foto, el precio nuevo y el precio anterior tachado. El carrito y el mensaje de WhatsApp usan el precio con descuento. El precio final se redondea a la decena (ej. 289.990 − 15 % = 246.490).
+
+**Producto nuevo.** Se piden referencia (de ahí sale el código interno `r` + referencia en minúsculas), nombre, categoría, precio, descuento, descripción, tallas y colores con su cantidad, y hasta 10 fotos (la primera es la portada). Las fotos se reducen en el navegador (lado mayor 1600 px) y se suben a Cloudinary con el preset sin firma `tezcanela_catalogo`; el script solo acepta direcciones de fotos de esa cuenta de Cloudinary. El script crea una fila en `Productos`, una por talla/color en `Variantes` (SKU `REF-COL-TALLA`) y una por foto en `Imagenes`. No permite repetir una referencia.
+
+**Compartir.** En el celular abre el menú de compartir con la **foto** y un mensaje (nombre, precio con descuento y enlace). En el computador ofrece *Enviar por WhatsApp* y *Copiar mensaje*. El enlace es `…/catalogo/?ver=ID`: carga la página `/catalogo` (que GitHub Pages sirve con éxito y con la tarjeta de vista previa) y la app abre la ficha del producto. La vista previa del enlace es la general del catálogo; la foto del producto va aparte, adjunta, en el celular.
 
 ### Cómo funciona
 
 - El panel está en la ruta `/admin` (enlace discreto "Administración" en el pie de página). No se indexa en buscadores.
 - Escribe en el Sheet a través del Apps Script (`doPost` en `apps-script/Code.gs`). El script corre con la cuenta del propietario, así que funciona aunque el Sheet sea privado.
 - **La clave nunca está en el código del sitio ni en el repositorio** (que es público). Se guarda en las *Propiedades del script* (`ADMIN_CLAVE`) y se valida en el servidor.
-- Protecciones: bloqueo de 10 minutos tras 5 claves incorrectas; validación estricta de cada dato (stock entero ≥ 0, precio numérico, activo booleano); cambios de todo o nada; un ajuste no puede tocar variantes de otro producto; cada cambio queda en la pestaña `Registro` (se crea sola); la caché del catálogo se borra al guardar, así el sitio lee datos frescos.
-- Un producto con `activo = FALSE` no aparece en el catálogo ni se abre por enlace directo.
+- Acciones del script: `verificar`, `guardarProducto` (precio, descuento, activo, stock), `aplicarDescuento` (categoría o todo) y `crearProducto`.
+- Protecciones: bloqueo de 10 minutos tras 5 claves incorrectas; validación estricta de cada dato; cambios de todo o nada; textos que empiezan con `= + - @` se guardan como texto (no como fórmula); un ajuste no puede tocar variantes de otro producto; cada cambio queda en la pestaña `Registro` (se crea sola); la caché del catálogo se borra al guardar.
+- Un producto con `activo = FALSO` no aparece en el catálogo ni se abre por enlace directo.
 
-### Cómo activarlo (una sola vez)
+### Cómo activarlo (o actualizarlo)
 
 1. Abrir el Google Sheet → **Extensiones → Apps Script**.
 2. Reemplazar **todo** el contenido de `Code.gs` por el de [`apps-script/Code.gs`](../apps-script/Code.gs).
-3. Engranaje **Configuración del proyecto → Propiedades del script → Agregar propiedad**: nombre `ADMIN_CLAVE`, valor = la clave elegida (mínimo 10 caracteres; no escribirla en archivos ni chats).
+3. (Solo la primera vez) Engranaje **Configuración del proyecto → Propiedades del script → Agregar propiedad**: nombre `ADMIN_CLAVE`, valor = la clave elegida (mínimo 10 caracteres; no escribirla en archivos ni chats).
 4. **Implementar → Gestionar implementaciones →** lápiz **→ Nueva versión → Implementar**. Google pedirá autorizar permisos.
-5. Entrar a `/admin` en el sitio, escribir la clave y probar un ajuste pequeño. Verificar que quedó una fila en la pestaña `Registro`.
+5. Entrar a `/admin`, escribir la clave y probar un ajuste pequeño. Verificar que quedó una fila en la pestaña `Registro`.
 6. Dejar el Google Sheet **privado** (Compartir → quitar a todas las personas excepto el propietario).
 
-Si el panel muestra "falta actualizar el script", el paso 2 o el 4 no se completó. Cambiar la clave: editar la propiedad `ADMIN_CLAVE` (no requiere nueva implementación).
+Si el panel dice "El script de Google todavía no tiene esta función", falta el paso 2 o el 4. Cambiar la clave: editar la propiedad `ADMIN_CLAVE` (no requiere nueva implementación).
 
 ### Pruebas
 
-- `Code.gs` se probó con un simulador de los servicios de Google (11 pruebas: clave ausente, incorrecta y correcta; bloqueo; reinicio del contador; guardado de precio/activo/stock; bitácora y caché; todo o nada; variantes de otro producto; datos inválidos; acciones y JSON inválidos; `doGet` intacto).
-- La interfaz se probó de punta a punta con un simulador del servidor (entrar, clave incorrecta, valores inválidos, editar, guardar, ocultar, enlace directo a producto oculto, sesión y salir), en escritorio y celular.
-- Pendiente tras activarlo: una prueba contra el Sheet real.
+- `node apps-script/prueba_code_gs.cjs` prueba `Code.gs` con un simulador de los servicios de Google (18 pruebas: acceso y bloqueo; descuento por producto y por categoría; creación de productos —columnas, SKU únicos, referencia repetida, 28 tipos de datos inválidos sin escribir nada, fórmulas, columnas reordenadas—; precio/activo/stock; todo o nada).
+- La interfaz se probó de punta a punta contra el `Code.gs` real con hojas simuladas: entrar, descuento de un producto y de una categoría, franja y precio tachado en el catálogo y la ficha, precio con descuento en el carrito, crear un producto con fotos, menú de compartir y apertura del enlace compartido.
+- Pendiente tras activarlo: una prueba contra el Sheet real y desde un celular.
 
-### Alcance
+### Importante: ya no se vuelven a importar los CSV
 
-El panel **no** crea productos ni sube fotos: eso sigue siendo en el Sheet (productos/variantes/imagenes) y en Cloudinary, por quien administra.
+Con el panel, los productos nuevos se crean desde la app. **Importar un CSV con "Reemplazar hoja actual" borra los ajustes hechos desde el panel** (stock, descuentos). Para cambios masivos en el Sheet, editar las celdas directamente.
 
 ---
 

@@ -1,18 +1,22 @@
 import { Link } from 'react-router-dom'
 import ImagenProducto from './ImagenProducto'
-
-function formatoPrecio(valor) {
-  return valor.toLocaleString('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 })
-}
+import { formatoPrecio, porcentajeDescuento, precioFinal } from '../utils/precios'
 
 export default function ProductoCard({ producto }) {
+  const descuento = porcentajeDescuento(producto)
   return (
     <Link to={`/producto/${producto.id}`} className="producto-card">
-      <ImagenProducto producto={producto} className="producto-card-imagen" />
+      <div className="franja-contenedor">
+        <ImagenProducto producto={producto} className="producto-card-imagen" />
+        {descuento > 0 && <span className="franja-descuento">-{descuento}%</span>}
+      </div>
       <div className="producto-card-info">
         <p className="producto-card-categoria">{producto.categoria}</p>
         <h3>{producto.nombre}</h3>
-        <p className="producto-card-precio">{formatoPrecio(producto.precio)}</p>
+        <p className="producto-card-precio">
+          {formatoPrecio(precioFinal(producto))}
+          {descuento > 0 && <s className="precio-antes">{formatoPrecio(producto.precio)}</s>}
+        </p>
       </div>
     </Link>
   )

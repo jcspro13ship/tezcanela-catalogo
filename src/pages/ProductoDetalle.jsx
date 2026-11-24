@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useCatalogo, variantesDe } from '../context/CatalogoContext'
-import { formatoPrecio } from '../components/ProductoCard'
+import { formatoPrecio, porcentajeDescuento, precioFinal } from '../utils/precios'
+import BotonCompartir from '../components/BotonCompartir'
+import { precargarFoto } from '../utils/compartir'
 import GaleriaProducto from '../components/GaleriaProducto'
 import { useCart } from '../context/CartContext'
 
@@ -49,6 +51,11 @@ export default function ProductoDetalle() {
     }
   }, [colores, colorSeleccionado])
 
+  // La foto se descarga con anticipación para poder compartirla con un solo toque.
+  useEffect(() => {
+    if (producto) precargarFoto(producto)
+  }, [producto])
+
   if (cargando) {
     return (
       <div className="pagina-producto">
@@ -91,11 +98,14 @@ export default function ProductoDetalle() {
       nombre: producto.nombre,
       talla: tallaSeleccionada,
       color: colorSeleccionado,
-      precio: producto.precio,
+      precio: precioFinal(producto),
       cantidad,
     })
     setMensaje('Producto agregado al carrito.')
   }
+
+  const descuento = porcentajeDescuento(producto)
+  const final = precioFinal(producto)
 
   return (
     <div className="pagina-producto">
@@ -104,12 +114,23 @@ export default function ProductoDetalle() {
       </Link>
 
       <div className="producto-detalle">
-        <GaleriaProducto producto={producto} className="producto-detalle-imagen" />
+        <div className="franja-contenedor">
+          <GaleriaProducto producto={producto} className="producto-detalle-imagen" />
+          {descuento > 0 && <span className="franja-descuento">-{descuento}%</span>}
+        </div>
 
         <div className="producto-detalle-info">
           <p className="producto-card-categoria">{producto.categoria}</p>
           <h1>{producto.nombre}</h1>
-          <p className="producto-detalle-precio">{formatoPrecio(producto.precio)}</p>
+          <p className="producto-detalle-precio">
+            {formatoPrecio(final)}
+            {descuento > 0 && <s className="precio-antes">{formatoPrecio(producto.precio)}</s>}
+          </p>
+          {descuento > 0 && (
+            <p className="producto-detalle-ahorro">
+              {descuento}% de descuento: ahorras {formatoPrecio(producto.precio - final)}
+            </p>
+          )}
           <p className="producto-detalle-descripcion">{producto.descripcion}</p>
 
           <div className="selector-bloque">
@@ -181,6 +202,8 @@ export default function ProductoDetalle() {
           <button className="boton boton-secundario" onClick={() => navigate('/carrito')}>
             Ir al carrito
           </button>
+
+          <BotonCompartir producto={producto} />
         </div>
       </div>
     </div>
