@@ -1,4 +1,4 @@
-import { formatoPrecio, porcentajeDescuento, precioFinal } from './precios'
+import { formatoFecha, formatoPrecio, porcentajeDescuento, precioFinal } from './precios'
 import { conAncho } from './imagenUrl'
 
 // Enlace que se comparte. Apunta a la página /catalogo (que GitHub Pages sirve
@@ -13,7 +13,9 @@ export function textoCompartir(producto) {
   const precio = formatoPrecio(precioFinal(producto))
   return [
     `${producto.nombre} — Tez Canela`,
-    d > 0 ? `${precio} (${d}% de descuento)` : precio,
+    d > 0
+      ? `${precio} (${d}% de descuento${producto.descuento_hasta ? ` hasta el ${formatoFecha(producto.descuento_hasta)}` : ''})`
+      : precio,
     `Mírala aquí: ${urlProducto(producto.id)}`,
   ].join('\n')
 }
@@ -21,6 +23,7 @@ export function textoCompartir(producto) {
 // La foto se descarga ANTES de que la persona toque "Compartir": los celulares
 // solo dejan abrir el menú de compartir justo después de un toque, no tras una espera.
 const fotos = new Map() // url de la portada -> File | null (null = no se pudo)
+const descargando = new Map() // url de la portada -> Promise (descarga en curso)
 
 function urlPortada(producto) {
   const portada = producto.imagenes && producto.imagenes[0]
@@ -31,12 +34,15 @@ export function precargarFoto(producto) {
   const url = urlPortada(producto)
   if (!url || fotos.has(url)) return
   fotos.set(url, null)
-  fetch(url)
-    .then((r) => (r.ok ? r.blob() : null))
-    .then((b) => {
-      if (b) fotos.set(url, new File([b], `${producto.id}.jpg`, { type: b.type || 'image/jpeg' }))
-    })
-    .catch(() => {})
+  descargando.set(
+    url,
+    fetch(url)
+      .then((r) => (r.ok ? r.blob() : null))
+      .then((b) => {
+        if (b) fotos.set(url, new File([b], `${producto.id}.jpg`, { type: b.type || 'image/jpeg' }))
+      })
+      .catch(() => {})
+  )
 }
 
 export function puedeCompartirNativo() {
@@ -49,6 +55,10 @@ export async function compartirNativo(producto) {
   if (!puedeCompartirNativo()) return 'no'
   const texto = textoCompartir(producto)
   const url = urlPortada(producto)
+  // Si la foto aún se está descargando, se espera un momento (sin dejar pasar el toque).
+  if (url && !fotos.get(url) && descargando.has(url)) {
+    await Promise.race([descargando.get(url), new Promise((ok) => setTimeout(ok, 1500))])
+  }
   const foto = url ? fotos.get(url) : null
   try {
     if (foto && navigator.canShare && navigator.canShare({ files: [foto] })) {

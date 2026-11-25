@@ -8,7 +8,7 @@ import { SHEETS_API_URL } from '../config'
 function normalizarProductos(productos) {
   return productos.map((p) => {
     const imagenes = Array.isArray(p.imagenes) && p.imagenes.length > 0 ? p.imagenes : p.imagen ? [p.imagen] : []
-    return { ...p, imagenes, descuento: Number(p.descuento) || 0 }
+    return { ...p, imagenes, descuento: Number(p.descuento) || 0, descuento_hasta: p.descuento_hasta || '' }
   })
 }
 

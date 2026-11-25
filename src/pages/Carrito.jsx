@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
+import { useCatalogo } from '../context/CatalogoContext'
+import { precioFinal } from '../utils/precios'
 import { formatoPrecio } from '../components/ProductoCard'
 import { WHATSAPP_NUMBER } from '../config'
 
@@ -29,9 +31,18 @@ function construirMensajeWhatsApp(items, total, cliente) {
 }
 
 export default function Carrito() {
-  const { items, removeItem, updateCantidad, total } = useCart()
+  const { items, removeItem, updateCantidad } = useCart()
+  const { productos } = useCatalogo()
   const [cliente, setCliente] = useState({ nombre: '', telefono: '', email: '' })
   const [error, setError] = useState('')
+
+  // El carrito siempre cobra el precio VIGENTE del catálogo (si un descuento venció
+  // o cambió el precio desde que se agregó el producto, se actualiza solo).
+  const lineas = items.map((it) => {
+    const p = productos.find((x) => x.id === it.productoId)
+    return p ? { ...it, precio: precioFinal(p) } : it
+  })
+  const total = lineas.reduce((acc, it) => acc + it.precio * it.cantidad, 0)
 
   if (items.length === 0) {
     return (
@@ -68,7 +79,7 @@ export default function Carrito() {
       return
     }
 
-    const url = construirMensajeWhatsApp(items, total, { nombre, telefono, email })
+    const url = construirMensajeWhatsApp(lineas, total, { nombre, telefono, email })
     window.open(url, '_blank', 'noopener,noreferrer')
   }
 
@@ -77,7 +88,7 @@ export default function Carrito() {
       <h1>Carrito</h1>
 
       <div className="carrito-lista">
-        {items.map((it) => (
+        {lineas.map((it) => (
           <div key={it.sku} className="carrito-item">
             <div className="carrito-item-info">
               <p className="carrito-item-nombre">{it.nombre}</p>

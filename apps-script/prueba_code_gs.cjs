@@ -7,6 +7,7 @@ const assert = require('assert')
 
 const CLAVE = 'clave-secreta-123'
 const CLOUD = 'https://res.cloudinary.com/sa0ainfh/image/upload/v1/tezcanela/'
+const enDias = (d) => new Date(Date.now() + d * 86400e3 - 5 * 3600e3).toISOString().slice(0, 10) // fecha de Colombia, hoy + d días
 
 function crearEntorno({ clave = CLAVE, conDescuento = false } = {}) {
   const datos = {
@@ -31,8 +32,9 @@ function crearEntorno({ clave = CLAVE, conDescuento = false } = {}) {
     getLastRow: () => datos[nombre].length,
     getRange: (r, c, nr, nc) =>
       nr === undefined
-        ? { setValue: (v) => { while (datos[nombre].length < r) datos[nombre].push([]); datos[nombre][r - 1][c - 1] = v } }
+        ? { setNumberFormat() { return this }, setValue: (v) => { while (datos[nombre].length < r) datos[nombre].push([]); datos[nombre][r - 1][c - 1] = v } }
         : {
+            setNumberFormat() { return this },
             setValues: (vals) => {
               assert.strictEqual(vals.length, nr)
               vals.forEach((fila, i) => {
@@ -48,6 +50,7 @@ function crearEntorno({ clave = CLAVE, conDescuento = false } = {}) {
   const ctx = {
     SpreadsheetApp: {
       getActiveSpreadsheet: () => ({
+        getSpreadsheetTimeZone: () => 'America/Bogota',
         getSheetByName: (n) => (datos[n] ? hoja(n) : null),
         insertSheet: (n) => { datos[n] = []; return hoja(n) },
       }),
@@ -65,6 +68,7 @@ function crearEntorno({ clave = CLAVE, conDescuento = false } = {}) {
       MimeType: { JSON: 'json' },
       createTextOutput: (t) => ({ t, setMimeType() { return this }, getContent: () => t }),
     },
+    Utilities: { formatDate: (d) => new Date(d.getTime() - 5 * 3600e3).toISOString().slice(0, 10) }, // hora de Colombia (UTC-5)
     JSON, Date, Number, String, Array, Math, isFinite, Object, RegExp,
   }
   vm.createContext(ctx)
@@ -315,6 +319,67 @@ prueba('guardarFotos: datos inválidos o producto inexistente no cambian nada', 
 prueba('guardarFotos exige la clave', () => {
   const t = crearEntorno(); const antes = t.copia()
   assert.strictEqual(t.post({ clave: 'mala', accion: 'guardarFotos', id: 'r1', imagenes: [] }).claveIncorrecta, true)
+  assert.strictEqual(t.copia(), antes)
+})
+
+// ---- fecha de fin del descuento ------------------------------------------
+prueba('doGet entrega descuento_hasta como texto yyyy-MM-dd (acepta fechas de Sheets y texto; vacío si no hay)', () => {
+  const t = crearEntorno({ conDescuento: true })
+  t.datos.Productos[0].push('descuento_hasta')
+  t.datos.Productos[1].push(new Date('2026-12-31T12:00:00-05:00')) // fecha de Sheets
+  t.datos.Productos[2].push('2027-01-15')                            // texto
+  t.datos.Productos[3].push('mañana')                                // basura -> vacío
+  assert.deepStrictEqual(t.get().productos.map((p) => p.descuento_hasta), ['2026-12-31', '2027-01-15', ''])
+  assert.strictEqual(crearEntorno().get().productos[0].descuento_hasta, '') // hoja sin la columna
+})
+prueba('guardarProducto: descuento con fecha de fin (crea la columna, guarda texto, bitácora)', () => {
+  const t = crearEntorno(); const hasta = enDias(10)
+  assert.strictEqual(t.admin('guardarProducto', { id: 'r1', descuento: 20, hasta }).ok, true)
+  assert.strictEqual(t.datos.Productos[0][8], 'descuento_hasta'); assert.strictEqual(t.datos.Productos[1][8], hasta)
+  assert.strictEqual(t.get().productos.find((p) => p.id === 'r1').descuento_hasta, hasta)
+  assert.match(t.datos.Registro[1][2], new RegExp('descuento=20, hasta=' + hasta))
+  assert.strictEqual(t.admin('guardarProducto', { id: 'r1', hasta: '' }).ok, true) // quitar la fecha
+  assert.strictEqual(t.datos.Productos[1][8], '')
+  assert.strictEqual(t.admin('guardarProducto', { id: 'r1', hasta: enDias(0) }).ok, true) // hoy mismo sí vale
+})
+prueba('guardarProducto rechaza fechas inválidas o ya pasadas', () => {
+  const t = crearEntorno(); const antes = t.copia()
+  for (const h of [enDias(-1), '2020-01-01', '2026-02-31', '2026-13-01', '31/12/2026', '2026-1-5', 'hoy', 20261231, true]) {
+    assert.strictEqual(t.admin('guardarProducto', { id: 'r1', descuento: 10, hasta: h }).ok, false, 'debía rechazar ' + h)
+  }
+  assert.strictEqual(t.copia(), antes)
+})
+prueba('aplicarDescuento con fecha de fin: se escribe a los productos afectados; con 0 se borra', () => {
+  const t = crearEntorno({ conDescuento: true }); const hasta = enDias(7)
+  const r = t.admin('aplicarDescuento', { descuento: 25, hasta, categoria: 'Vestidos' })
+  assert.strictEqual(r.ok, true)
+  const col = t.datos.Productos[0].indexOf('descuento_hasta')
+  assert.deepStrictEqual(t.datos.Productos.slice(1).map((f) => f[col]), ['', hasta, hasta])
+  assert.match(t.datos.Registro[1][2], new RegExp('Vestidos \\| descuento=25 hasta ' + hasta + ' \\| 2 productos'))
+  t.admin('aplicarDescuento', { descuento: 0, hasta, categoria: 'Vestidos' })
+  assert.deepStrictEqual(t.datos.Productos.slice(1).map((f) => f[col]), ['', '', ''])
+})
+prueba('aplicarDescuento: no pisa la fecha de los productos que no entran en la categoría; rechaza fechas malas', () => {
+  const t = crearEntorno({ conDescuento: true }); const h1 = enDias(3); const h2 = enDias(9)
+  t.admin('aplicarDescuento', { descuento: 10, hasta: h1 })               // todos
+  t.admin('aplicarDescuento', { descuento: 30, hasta: h2, categoria: 'Blusas' })
+  const col = t.datos.Productos[0].indexOf('descuento_hasta')
+  assert.deepStrictEqual(t.datos.Productos.slice(1).map((f) => f[col]), [h2, h1, h1])
+  const antes = t.copia()
+  assert.strictEqual(t.admin('aplicarDescuento', { descuento: 10, hasta: enDias(-2) }).ok, false)
+  assert.strictEqual(t.admin('aplicarDescuento', { descuento: 10, hasta: 'x' }).ok, false)
+  assert.strictEqual(t.copia(), antes)
+})
+prueba('crearProducto con descuento y fecha de fin; sin descuento la fecha se ignora; fecha mala se rechaza', () => {
+  const t = crearEntorno(); const hasta = enDias(15)
+  assert.strictEqual(t.admin('crearProducto', nuevo({ descuento: 20, hasta })).ok, true)
+  const enc = t.datos.Productos[0]
+  assert.strictEqual(t.datos.Productos[4][enc.indexOf('descuento_hasta')], hasta)
+  assert.strictEqual(t.admin('crearProducto', nuevo({ ref: 'Z9', descuento: 0, hasta })).ok, true)
+  assert.strictEqual(t.datos.Productos[5][enc.indexOf('descuento_hasta')], '')
+  const antes = t.copia()
+  assert.strictEqual(t.admin('crearProducto', nuevo({ ref: 'Z8', descuento: 10, hasta: enDias(-1) })).ok, false)
+  assert.strictEqual(t.admin('crearProducto', nuevo({ ref: 'Z7', descuento: 10, hasta: '2026-02-30' })).ok, false)
   assert.strictEqual(t.copia(), antes)
 })
 

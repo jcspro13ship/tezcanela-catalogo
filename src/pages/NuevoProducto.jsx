@@ -2,12 +2,14 @@ import { useMemo, useState } from 'react'
 import { llamarAdmin } from '../admin/api'
 import { subirPendientes } from '../admin/fotos'
 import EditorFotos from './EditorFotos'
-import { formatoPrecio, precioFinal } from '../utils/precios'
+import { formatoFecha, formatoPrecio, hoyColombia, precioFinal } from '../utils/precios'
 
 const TALLAS_RAPIDAS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'G10', 'G12', 'G14', 'G16', '2', '4', '6', '8', '10', '12', '14', '16', 'Única']
 const OTRA = '__otra__'
 
 const entero = (t, min = 0, max = Infinity) => /^\d+$/.test(String(t).trim()) && Number(t) >= min && Number(t) <= max
+// Los números se aceptan como se escriben en Colombia (289.990, $ 289.990): se dejan solo los dígitos.
+const soloDigitos = (t) => String(t).replace(/\D/g, '')
 const normalizarRef = (t) => t.toUpperCase().replace(/[^A-Z0-9]/g, '')
 const llave = (v) => `${v.color.trim().toLowerCase()}|${v.talla.trim().toLowerCase()}`
 
@@ -19,6 +21,7 @@ export default function NuevoProducto({ clave, productos, categorias, recargar, 
   const [descripcion, setDescripcion] = useState('')
   const [precio, setPrecio] = useState('')
   const [descuento, setDescuento] = useState('0')
+  const [hasta, setHasta] = useState('')
   const [visible, setVisible] = useState(true)
   const [variantes, setVariantes] = useState([])
   const [colorNuevo, setColorNuevo] = useState('')
@@ -42,12 +45,13 @@ export default function NuevoProducto({ clave, productos, categorias, recargar, 
     else if (repetido) p.push(`Ya existe un producto con la referencia ${refLimpia}.`)
     if (!nombre.trim()) p.push('Escribe el nombre.')
     if (!categoriaFinal) p.push('Elige o escribe la categoría.')
-    if (!entero(precio, 1, 99999999)) p.push('El precio debe ser un número mayor que 0.')
+    if (!entero(precio, 1, 99999999)) p.push('Escribe el precio (solo el número, ej: 289990).')
     if (!entero(descuento || '0', 0, 90)) p.push('El descuento debe ser un número entre 0 y 90.')
+    if (Number(descuento) > 0 && hasta && hasta < hoyColombia()) p.push('La fecha de fin del descuento ya pasó.')
     if (variantes.length === 0) p.push('Agrega al menos una talla y color.')
     if (variantes.some((v) => !entero(v.stock))) p.push('Revisa las cantidades (números enteros de 0 o más).')
     return p
-  }, [refLimpia, repetido, nombre, categoriaFinal, precio, descuento, variantes])
+  }, [refLimpia, repetido, nombre, categoriaFinal, precio, descuento, hasta, variantes])
 
   const bloqueado = fase === 'enviando'
 
@@ -90,6 +94,7 @@ export default function NuevoProducto({ clave, productos, categorias, recargar, 
       descripcion: descripcion.trim(),
       precio: Number(precio),
       descuento: Number(descuento || 0),
+      ...(Number(descuento) > 0 && hasta ? { hasta } : {}),
       activo: visible,
       variantes: variantes.map((v) => ({ color: v.color.trim(), talla: v.talla.trim(), stock: Number(v.stock) })),
       imagenes: urls,
@@ -116,6 +121,7 @@ export default function NuevoProducto({ clave, productos, categorias, recargar, 
     setDescripcion('')
     setPrecio('')
     setDescuento('0')
+    setHasta('')
     setVisible(true)
     setVariantes([])
     setColorNuevo('')
@@ -179,13 +185,21 @@ export default function NuevoProducto({ clave, productos, categorias, recargar, 
         </label>
         <label className="admin-campo">
           Precio (COP) *
-          <input inputMode="numeric" value={precio} onChange={(e) => setPrecio(e.target.value)} placeholder="Ej: 289990" disabled={bloqueado} className={precio && !entero(precio, 1) ? 'admin-invalido' : ''} />
+          <input inputMode="numeric" value={precio} onChange={(e) => setPrecio(soloDigitos(e.target.value))} placeholder="Ej: 289990" disabled={bloqueado} className={precio && !entero(precio, 1) ? 'admin-invalido' : ''} />
+          {precioNum > 0 && <small>{formatoPrecio(precioNum)}</small>}
         </label>
         <label className="admin-campo">
           Descuento (%)
-          <input inputMode="numeric" value={descuento} onChange={(e) => setDescuento(e.target.value)} disabled={bloqueado} className={entero(descuento || '0', 0, 90) ? '' : 'admin-invalido'} />
+          <input inputMode="numeric" value={descuento} onChange={(e) => setDescuento(soloDigitos(e.target.value))} disabled={bloqueado} className={entero(descuento || '0', 0, 90) ? '' : 'admin-invalido'} />
           {dto > 0 && precioNum > 0 && <small>Se venderá en {formatoPrecio(precioFinal({ precio: precioNum, descuento: dto }))}</small>}
         </label>
+        {Number(descuento) > 0 && (
+          <label className="admin-campo">
+            Último día del descuento (opcional)
+            <input type="date" min={hoyColombia()} value={hasta} onChange={(e) => setHasta(e.target.value)} disabled={bloqueado} />
+            <small>{hasta ? `Vale hasta el ${formatoFecha(hasta)} inclusive.` : 'Sin fecha: dura hasta que lo quites.'}</small>
+          </label>
+        )}
         <label className="admin-campo admin-check">
           <input type="checkbox" checked={visible} onChange={(e) => setVisible(e.target.checked)} disabled={bloqueado} />
           Visible en el catálogo al crearlo
@@ -222,7 +236,7 @@ export default function NuevoProducto({ clave, productos, categorias, recargar, 
         </div>
         <label className="admin-campo admin-stock-gen">
           Cantidad de cada una
-          <input inputMode="numeric" value={stockGen} onChange={(e) => setStockGen(e.target.value)} disabled={bloqueado} />
+          <input inputMode="numeric" value={stockGen} onChange={(e) => setStockGen(soloDigitos(e.target.value))} disabled={bloqueado} />
         </label>
         <button type="button" className="chip" onClick={agregarVariantes} disabled={bloqueado || !colorNuevo.trim() || (tallasSel.length === 0 && !tallaOtra.trim())}>
           Agregar al listado
@@ -250,7 +264,7 @@ export default function NuevoProducto({ clave, productos, categorias, recargar, 
                     value={v.stock}
                     disabled={bloqueado}
                     className={entero(v.stock) ? '' : 'admin-invalido'}
-                    onChange={(e) => setVariantes((a) => a.map((x, k) => (k === i ? { ...x, stock: e.target.value } : x)))}
+                    onChange={(e) => setVariantes((a) => a.map((x, k) => (k === i ? { ...x, stock: soloDigitos(e.target.value) } : x)))}
                   />
                 </td>
                 <td>

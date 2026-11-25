@@ -957,3 +957,68 @@ main {
   width: 100%;
   max-width: 34rem;
 }
+
+/* Compartir desde la tarjeta del catálogo */
+.producto-card {
+  position: relative;
+}
+
+.producto-card-enlace {
+  display: block;
+}
+
+.producto-card-compartir {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+}
+
+.compartir-icono {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--negro);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.compartir-icono:hover {
+  background: var(--blanco);
+  border-color: var(--negro);
+}
+
+.compartir-fondo {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 40;
+}
+
+/* En el catálogo el menú es una ventana centrada: así nunca se corta en el borde del celular. */
+.compartir-menu-modal {
+  position: fixed;
+  z-index: 41;
+  top: 50%;
+  left: 50%;
+  right: auto;
+  transform: translate(-50%, -50%);
+  width: min(90vw, 20rem);
+  padding: 0.6rem;
+}
+
+.compartir-titulo {
+  padding: 0.3rem 0.7rem 0.5rem;
+  font-size: 0.95rem;
+  border-bottom: 1px solid var(--gris-borde);
+  margin-bottom: 0.3rem;
+}
+
+.admin-fecha-fin {
+  color: #b3261e;
+  font-size: 0.85rem;
+}

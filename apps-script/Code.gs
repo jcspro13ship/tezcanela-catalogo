@@ -54,6 +54,7 @@ function doGet(e) {
       descripcion: p.descripcion,
       precio: Number(p.precio) || 0,
       descuento: Number(p.descuento) || 0,
+      descuento_hasta: fechaIso_(p.descuento_hasta),
       imagenes: imagenes,
       activo: esVerdadero(p.activo),
     }
@@ -182,6 +183,50 @@ function asegurarColumna_(hoja, nombre) {
   for (var i = 1; i < hoja.valores.length; i++) hoja.valores[i].push('')
 }
 
+// Zona horaria del Sheet (Colombia si el Sheet está configurado así).
+function zonaHoraria_() {
+  return SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone() || 'America/Bogota'
+}
+
+// Convierte lo que haya en la celda (fecha de Sheets o texto "2026-12-31") a "2026-12-31"; vacío si no es una fecha.
+function fechaIso_(v) {
+  if (v === undefined || v === null || v === '') return ''
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    if (isNaN(v.getTime())) return ''
+    return Utilities.formatDate(v, zonaHoraria_(), 'yyyy-MM-dd')
+  }
+  var t = String(v).trim()
+  return /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : ''
+}
+
+function hoyIso_() {
+  return Utilities.formatDate(new Date(), zonaHoraria_(), 'yyyy-MM-dd')
+}
+
+// true si es una fecha real "yyyy-MM-dd" (ej. rechaza 2026-02-31).
+function fechaValida_(t) {
+  if (typeof t !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(t)) return false
+  var p = t.split('-')
+  var d = new Date(Date.UTC(Number(p[0]), Number(p[1]) - 1, Number(p[2])))
+  return d.getUTCFullYear() === Number(p[0]) && d.getUTCMonth() === Number(p[1]) - 1 && d.getUTCDate() === Number(p[2])
+}
+
+// Valida el campo "hasta" (fecha fin del descuento). '' o null = sin fecha de fin.
+// Devuelve un mensaje de error o '' si está bien.
+function errorHasta_(hasta) {
+  if (hasta === '' || hasta === null || hasta === undefined) return ''
+  if (!fechaValida_(hasta)) return 'La fecha de fin del descuento no es válida.'
+  if (hasta < hoyIso_()) return 'La fecha de fin del descuento ya pasó.'
+  return ''
+}
+
+// Escribe una fecha como TEXTO (no como fecha de Sheets) para que no cambie por zona horaria.
+function escribirFecha_(hoja, fila, columna, valor) {
+  var rango = hoja.sheet.getRange(fila, hoja.col[columna] + 1)
+  rango.setNumberFormat('@')
+  rango.setValue(valor || '')
+}
+
 function esEntero_(v, min, max) {
   return typeof v === 'number' && isFinite(v) && v === Math.floor(v) && v >= min && v <= max
 }
@@ -191,7 +236,8 @@ function textoSeguro_(t) {
   return /^[=+\-@]/.test(t) ? "'" + t : t
 }
 
-// req: { id, nombre?, descripcion?, categoria?, precio?, descuento?, activo?, stocks?: [{ sku, stock }] }
+// req: { id, nombre?, descripcion?, categoria?, precio?, descuento?, hasta?, activo?, stocks?: [{ sku, stock }] }
+// "hasta" = último día del descuento ("2026-12-31"); '' lo deja sin fecha de fin.
 function guardarProducto_(req) {
   var id = typeof req.id === 'string' ? req.id.trim() : ''
   if (!id) return { ok: false, error: 'Falta el id del producto.' }
@@ -201,6 +247,7 @@ function guardarProducto_(req) {
   var tieneCategoria = req.categoria !== undefined && req.categoria !== null
   var tienePrecio = req.precio !== undefined && req.precio !== null
   var tieneDescuento = req.descuento !== undefined && req.descuento !== null
+  var tieneHasta = req.hasta !== undefined && req.hasta !== null
   var tieneActivo = req.activo !== undefined && req.activo !== null
   var stocks = Array.isArray(req.stocks) ? req.stocks : []
 
@@ -219,6 +266,7 @@ function guardarProducto_(req) {
   if (tieneDescuento && !esEntero_(req.descuento, 0, 90)) {
     return { ok: false, error: 'Descuento inválido (debe ser un número entero entre 0 y 90).' }
   }
+  if (tieneHasta && errorHasta_(req.hasta)) return { ok: false, error: errorHasta_(req.hasta) }
   if (tieneActivo && typeof req.activo !== 'boolean') return { ok: false, error: 'Valor de "activo" inválido.' }
   if (stocks.length > 300) return { ok: false, error: 'Demasiados cambios de stock en una sola solicitud.' }
   for (var k = 0; k < stocks.length; k++) {
@@ -227,7 +275,7 @@ function guardarProducto_(req) {
       return { ok: false, error: 'Stock inválido (debe ser un número entero de 0 o más).' }
     }
   }
-  if (!tieneNombre && !tieneDescripcion && !tieneCategoria && !tienePrecio && !tieneDescuento && !tieneActivo && stocks.length === 0) return { ok: false, error: 'No hay cambios para guardar.' }
+  if (!tieneNombre && !tieneDescripcion && !tieneCategoria && !tienePrecio && !tieneDescuento && !tieneHasta && !tieneActivo && stocks.length === 0) return { ok: false, error: 'No hay cambios para guardar.' }
 
   var lock = LockService.getScriptLock()
   lock.waitLock(20000)
@@ -271,6 +319,11 @@ function guardarProducto_(req) {
       productos.sheet.getRange(filaProd, productos.col['descuento'] + 1).setValue(req.descuento)
       detalle.push('descuento=' + req.descuento)
     }
+    if (tieneHasta) {
+      asegurarColumna_(productos, 'descuento_hasta')
+      escribirFecha_(productos, filaProd, 'descuento_hasta', req.hasta)
+      detalle.push('hasta=' + (req.hasta || 'sin fecha'))
+    }
     if (tieneActivo) {
       productos.sheet.getRange(filaProd, productos.col['activo'] + 1).setValue(req.activo)
       detalle.push('activo=' + req.activo)
@@ -290,33 +343,48 @@ function guardarProducto_(req) {
 
 // Aplica (o quita, con 0) un descuento a todos los productos de una categoría,
 // o a todo el catálogo si no se indica categoría.
-// req: { descuento: 0..90, categoria?: string }
+// req: { descuento: 0..90, hasta?: "yyyy-MM-dd", categoria?: string }
+// Con descuento 0 también se borra la fecha de fin.
 function aplicarDescuento_(req) {
   if (!esEntero_(req.descuento, 0, 90)) {
     return { ok: false, error: 'Descuento inválido (debe ser un número entero entre 0 y 90).' }
   }
+  var hasta = req.descuento === 0 ? '' : req.hasta
+  if (errorHasta_(hasta)) return { ok: false, error: errorHasta_(hasta) }
+  hasta = hasta || ''
   var categoria = typeof req.categoria === 'string' ? req.categoria.trim() : ''
 
   var lock = LockService.getScriptLock()
   lock.waitLock(20000)
   try {
     var productos = leerHoja_('Productos')
-    asegurarColumna_(productos, 'descuento')
     var cCat = productos.col['categoria']
-    var cDto = productos.col['descuento']
     var cId = productos.col['id']
-    var nuevos = []
-    var cambiados = 0
-    for (var i = 1; i < productos.valores.length; i++) {
-      var fila = productos.valores[i]
-      var coincide = !categoria || String(fila[cCat]) === categoria
-      var actual = fila[cDto]
-      nuevos.push([coincide && fila[cId] !== '' ? req.descuento : actual])
-      if (coincide && fila[cId] !== '') cambiados++
+    function aplicaA(fila) {
+      return fila[cId] !== '' && (!categoria || String(fila[cCat]) === categoria)
     }
+    var cambiados = 0
+    for (var i = 1; i < productos.valores.length; i++) if (aplicaA(productos.valores[i])) cambiados++
     if (cambiados === 0) return { ok: false, error: 'No hay productos en esa categoría.' }
+
+    // Recién ahora se tocan las columnas y los datos.
+    asegurarColumna_(productos, 'descuento')
+    asegurarColumna_(productos, 'descuento_hasta')
+    var cDto = productos.col['descuento']
+    var cHasta = productos.col['descuento_hasta']
+    var nuevos = []
+    var nuevasFechas = []
+    for (var j = 1; j < productos.valores.length; j++) {
+      var fila = productos.valores[j]
+      var aplica = aplicaA(fila)
+      nuevos.push([aplica ? req.descuento : fila[cDto]])
+      nuevasFechas.push([aplica ? hasta : fechaIso_(fila[cHasta])])
+    }
     productos.sheet.getRange(2, cDto + 1, nuevos.length, 1).setValues(nuevos)
-    registrar_('aplicarDescuento', (categoria || 'TODO EL CATÁLOGO') + ' | descuento=' + req.descuento + ' | ' + cambiados + ' productos')
+    var rangoFechas = productos.sheet.getRange(2, cHasta + 1, nuevasFechas.length, 1)
+    rangoFechas.setNumberFormat('@')
+    rangoFechas.setValues(nuevasFechas)
+    registrar_('aplicarDescuento', (categoria || 'TODO EL CATÁLOGO') + ' | descuento=' + req.descuento + (hasta ? ' hasta ' + hasta : '') + ' | ' + cambiados + ' productos')
     CacheService.getScriptCache().remove(CACHE_KEY)
     return { ok: true, productos: cambiados }
   } finally {
@@ -396,7 +464,7 @@ function sinTildes_(t) {
 
 // Crea un producto nuevo: una fila en Productos, una por cada talla/color en
 // Variantes y una por foto en Imagenes. Todo se valida antes de escribir nada.
-// req: { ref, nombre, categoria, descripcion?, precio, descuento?, activo?,
+// req: { ref, nombre, categoria, descripcion?, precio, descuento?, hasta?, activo?,
 //        variantes: [{ color, talla, stock }], imagenes?: [url de Cloudinary] }
 function crearProducto_(req) {
   var ref = typeof req.ref === 'string' ? req.ref.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : ''
@@ -412,6 +480,8 @@ function crearProducto_(req) {
   if (!esEntero_(req.precio, 1, 99999999)) return { ok: false, error: 'Precio inválido (número entero mayor que 0).' }
   var descuento = req.descuento === undefined || req.descuento === null ? 0 : req.descuento
   if (!esEntero_(descuento, 0, 90)) return { ok: false, error: 'Descuento inválido (número entero entre 0 y 90).' }
+  var hastaNuevo = descuento > 0 && req.hasta ? req.hasta : ''
+  if (errorHasta_(hastaNuevo)) return { ok: false, error: errorHasta_(hastaNuevo) }
   var activo = req.activo === undefined || req.activo === null ? true : req.activo
   if (typeof activo !== 'boolean') return { ok: false, error: 'Valor de "activo" inválido.' }
 
@@ -446,6 +516,7 @@ function crearProducto_(req) {
     var variantes = leerHoja_('Variantes')
     var imagenes = fotos.length ? leerHoja_('Imagenes') : null
     asegurarColumna_(productos, 'descuento')
+    if (hastaNuevo) asegurarColumna_(productos, 'descuento_hasta')
 
     // SKU único: REF-COL-TALLA (y -2, -3… si ya existiera)
     var usados = {}
@@ -485,7 +556,12 @@ function crearProducto_(req) {
       imagen: '',
       activo: activo,
       descuento: descuento,
+      descuento_hasta: hastaNuevo,
     }])
+    if (hastaNuevo) {
+      var filaNueva = productos.sheet.getLastRow()
+      escribirFecha_(productos, filaNueva, 'descuento_hasta', hastaNuevo)
+    }
     agregar(variantes, filasVar)
     if (fotos.length) {
       agregar(imagenes, fotos.map(function (u, k) { return { producto_id: id, orden: k + 1, url: u } }))

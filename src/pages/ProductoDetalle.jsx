@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useCatalogo, variantesDe } from '../context/CatalogoContext'
-import { formatoPrecio, porcentajeDescuento, precioFinal } from '../utils/precios'
+import { formatoFecha, formatoPrecio, porcentajeDescuento, precioFinal } from '../utils/precios'
 import BotonCompartir from '../components/BotonCompartir'
 import { precargarFoto } from '../utils/compartir'
 import GaleriaProducto from '../components/GaleriaProducto'
@@ -128,7 +128,9 @@ export default function ProductoDetalle() {
           </p>
           {descuento > 0 && (
             <p className="producto-detalle-ahorro">
-              {descuento}% de descuento: ahorras {formatoPrecio(producto.precio - final)}
+              {descuento}% de descuento
+              {producto.descuento_hasta ? ` hasta el ${formatoFecha(producto.descuento_hasta)}` : ''}: ahorras{' '}
+              {formatoPrecio(producto.precio - final)}
             </p>
           )}
           <p className="producto-detalle-descripcion">{producto.descripcion}</p>

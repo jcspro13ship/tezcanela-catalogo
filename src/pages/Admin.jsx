@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useCatalogo, variantesDe } from '../context/CatalogoContext'
-import { formatoPrecio, porcentajeDescuento, precioFinal } from '../utils/precios'
+import { descuentoVencido, formatoFecha, formatoPrecio, hoyColombia, porcentajeDescuento, precioFinal } from '../utils/precios'
 import { llamarAdmin } from '../admin/api'
 import { conAncho } from '../utils/imagenUrl'
 import BotonCompartir from '../components/BotonCompartir'
@@ -227,12 +227,15 @@ function Panel({ clave, onSalir }) {
 }
 
 const OTRA = '__otra__'
+// Los números se aceptan como se escriben en Colombia (289.990, $ 289.990): se dejan solo los dígitos.
+const soloDigitos = (t) => String(t).replace(/\D/g, '')
 const entero = (t) => /^\d+$/.test(String(t).trim())
 const descuentoValido = (t) => entero(t) && Number(t) <= 90
 
 function DescuentosPorCategoria({ clave, productos, categorias, recargar, onSalir }) {
   const [categoria, setCategoria] = useState('')
   const [porcentaje, setPorcentaje] = useState('')
+  const [hasta, setHasta] = useState('')
   const [trabajando, setTrabajando] = useState(false)
   const [mensaje, setMensaje] = useState(null)
 
@@ -243,11 +246,15 @@ function DescuentosPorCategoria({ clave, productos, categorias, recargar, onSali
     const texto =
       valor === 0
         ? `¿Quitar el descuento a ${afectados} productos de ${donde}?`
-        : `¿Aplicar ${valor}% de descuento a ${afectados} productos de ${donde}? Reemplaza el descuento que tengan ahora.`
+        : `¿Aplicar ${valor}% de descuento ${hasta ? `hasta el ${formatoFecha(hasta)} ` : 'SIN fecha de fin '}a ${afectados} productos de ${donde}? Reemplaza el descuento que tengan ahora.`
     if (!window.confirm(texto)) return
     setTrabajando(true)
     setMensaje(null)
-    const r = await llamarAdmin(clave, 'aplicarDescuento', { descuento: valor, ...(categoria ? { categoria } : {}) })
+    const r = await llamarAdmin(clave, 'aplicarDescuento', {
+      descuento: valor,
+      ...(valor > 0 && hasta ? { hasta } : {}),
+      ...(categoria ? { categoria } : {}),
+    })
     if (!r.ok) {
       setTrabajando(false)
       if (r.claveIncorrecta || r.bloqueado) return onSalir(r.error)
@@ -282,14 +289,19 @@ function DescuentosPorCategoria({ clave, productos, categorias, recargar, onSali
         </label>
         <label className="admin-campo">
           Descuento (%)
-          <input inputMode="numeric" value={porcentaje} onChange={(e) => setPorcentaje(e.target.value)} placeholder="Ej: 20" disabled={trabajando} className={!porcentaje || descuentoValido(porcentaje) ? '' : 'admin-invalido'} />
+          <input inputMode="numeric" value={porcentaje} onChange={(e) => setPorcentaje(soloDigitos(e.target.value))} placeholder="Ej: 20" disabled={trabajando} className={!porcentaje || descuentoValido(porcentaje) ? '' : 'admin-invalido'} />
+        </label>
+        <label className="admin-campo">
+          Último día del descuento (opcional)
+          <input type="date" min={hoyColombia()} value={hasta} onChange={(e) => setHasta(e.target.value)} disabled={trabajando} className={hasta && hasta < hoyColombia() ? 'admin-invalido' : ''} />
+          <small>{hasta ? `Vale hasta el ${formatoFecha(hasta)} inclusive.` : 'Sin fecha: dura hasta que lo quites.'}</small>
         </label>
       </div>
       <div className="admin-acciones">
         <button className="chip" onClick={() => aplicar(0)} disabled={trabajando || afectados === 0}>
           Quitar descuentos
         </button>
-        <button className="boton boton-primario" onClick={() => aplicar(Number(porcentaje))} disabled={trabajando || !descuentoValido(porcentaje) || Number(porcentaje) < 1 || afectados === 0}>
+        <button className="boton boton-primario" onClick={() => aplicar(Number(porcentaje))} disabled={trabajando || !descuentoValido(porcentaje) || Number(porcentaje) < 1 || afectados === 0 || (hasta && hasta < hoyColombia())}>
           {trabajando ? 'Aplicando…' : `Aplicar a ${afectados} productos`}
         </button>
       </div>
@@ -301,7 +313,8 @@ function DescuentosPorCategoria({ clave, productos, categorias, recargar, onSali
 function ProductoFila({ producto, categorias, variantes, clave, recargar, onSalir }) {
   const [abierto, setAbierto] = useState(false)
   const [precio, setPrecio] = useState(String(producto.precio))
-  const [descuento, setDescuento] = useState(String(porcentajeDescuento(producto)))
+  const [descuento, setDescuento] = useState(String(Math.round(Number(producto.descuento)) || 0))
+  const [hasta, setHasta] = useState(producto.descuento_hasta || '')
   const [nombre, setNombre] = useState(producto.nombre)
   const [descripcion, setDescripcion] = useState(producto.descripcion || '')
   const [categoria, setCategoria] = useState(producto.categoria)
@@ -317,7 +330,11 @@ function ProductoFila({ producto, categorias, variantes, clave, recargar, onSali
   const stockTotal = variantes.reduce((a, v) => a + v.stock, 0)
   const precioCambio = precio.trim() !== String(producto.precio)
   const descuentoActual = porcentajeDescuento(producto)
-  const descuentoCambio = descuento.trim() !== String(descuentoActual)
+  const descuentoGuardado = Math.round(Number(producto.descuento)) || 0
+  const descuentoCambio = descuento.trim() !== String(descuentoGuardado)
+  const hastaEfectiva = Number(descuento) > 0 ? hasta : ''
+  const hastaCambio = hastaEfectiva !== (producto.descuento_hasta || '')
+  const hastaPasada = !!hastaEfectiva && hastaEfectiva < hoyColombia()
   const categoriaFinal = categoria === OTRA ? categoriaNueva.trim() : categoria
   const nombreCambio = nombre.trim() !== producto.nombre
   const descripcionCambio = descripcion.trim() !== (producto.descripcion || '').trim()
@@ -325,10 +342,11 @@ function ProductoFila({ producto, categorias, variantes, clave, recargar, onSali
   const fotosCambiaron =
     fotos.length !== producto.imagenes.length || fotos.some((f, i) => f.url !== producto.imagenes[i])
   const stocksCambiados = variantes.filter((v) => (stocks[v.sku] ?? String(v.stock)).trim() !== String(v.stock))
-  const hayCambios = precioCambio || descuentoCambio || nombreCambio || descripcionCambio || categoriaCambio || stocksCambiados.length > 0
+  const hayCambios = precioCambio || descuentoCambio || hastaCambio || nombreCambio || descripcionCambio || categoriaCambio || stocksCambiados.length > 0
   const valido =
     entero(precio) &&
     descuentoValido(descuento) &&
+    !(hastaCambio && hastaPasada) &&
     nombre.trim().length > 0 &&
     nombre.trim().length <= 120 &&
     categoriaFinal.length > 0 &&
@@ -361,6 +379,7 @@ function ProductoFila({ producto, categorias, variantes, clave, recargar, onSali
         ...(categoriaCambio ? { categoria: categoriaFinal } : {}),
         ...(precioCambio ? { precio: Number(precio) } : {}),
         ...(descuentoCambio ? { descuento: Number(descuento) } : {}),
+        ...(hastaCambio ? { hasta: hastaEfectiva } : {}),
         ...(stocksCambiados.length
           ? { stocks: stocksCambiados.map((v) => ({ sku: v.sku, stock: Number(stocks[v.sku]) })) }
           : {}),
@@ -416,10 +435,14 @@ function ProductoFila({ producto, categorias, variantes, clave, recargar, onSali
             {producto.id} · {producto.categoria} ·{' '}
             {descuentoActual > 0 ? (
               <>
-                <strong>{formatoPrecio(precioFinal(producto))}</strong> <s>{formatoPrecio(producto.precio)}</s> (-{descuentoActual}%)
+                <strong>{formatoPrecio(precioFinal(producto))}</strong> <s>{formatoPrecio(producto.precio)}</s> (-{descuentoActual}%
+                {producto.descuento_hasta ? ` hasta ${formatoFecha(producto.descuento_hasta)}` : ''})
               </>
             ) : (
-              formatoPrecio(producto.precio)
+              <>
+                {formatoPrecio(producto.precio)}
+                {descuentoVencido(producto) && <span className="admin-fecha-fin"> (descuento vencido el {formatoFecha(producto.descuento_hasta)})</span>}
+              </>
             )}{' '}
             ·{' '}
             {stockTotal === 0 ? <strong>Agotado</strong> : `${stockTotal} en stock`}
@@ -467,22 +490,41 @@ function ProductoFila({ producto, categorias, variantes, clave, recargar, onSali
               <input
                 inputMode="numeric"
                 value={precio}
-                onChange={(e) => setPrecio(e.target.value)}
+                onChange={(e) => setPrecio(soloDigitos(e.target.value))}
                 className={entero(precio) ? '' : 'admin-invalido'}
               />
+              {entero(precio) && <small>{formatoPrecio(Number(precio))}</small>}
             </label>
             <label className="admin-campo">
               Descuento (%) — 0 para quitarlo
               <input
                 inputMode="numeric"
                 value={descuento}
-                onChange={(e) => setDescuento(e.target.value)}
+                onChange={(e) => setDescuento(soloDigitos(e.target.value))}
                 className={descuentoValido(descuento) ? '' : 'admin-invalido'}
               />
               {descuentoValido(descuento) && entero(precio) && Number(descuento) > 0 && (
-                <small>Se venderá en {formatoPrecio(precioFinal({ precio: Number(precio), descuento: Number(descuento) }))}</small>
+                <small>Se venderá en {formatoPrecio(precioFinal({ precio: Number(precio), descuento: Number(descuento), descuento_hasta: hastaEfectiva }))}</small>
               )}
             </label>
+            {Number(descuento) > 0 && (
+              <label className="admin-campo">
+                Último día del descuento (opcional)
+                <input type="date" min={hoyColombia()} value={hasta} onChange={(e) => setHasta(e.target.value)} className={hastaCambio && hastaPasada ? 'admin-invalido' : ''} />
+                <small className={hastaPasada ? 'admin-fecha-fin' : ''}>
+                  {hasta
+                    ? hastaPasada
+                      ? `El ${formatoFecha(hasta)} ya pasó: el descuento no se aplica. Elige otra fecha o bórrala.`
+                      : `Vale hasta el ${formatoFecha(hasta)} inclusive.`
+                    : 'Sin fecha: dura hasta que lo quites.'}
+                </small>
+                {hasta && (
+                  <button type="button" className="chip" onClick={() => setHasta('')}>
+                    Quitar la fecha
+                  </button>
+                )}
+              </label>
+            )}
           </div>
 
           <table className="admin-variantes">
@@ -502,7 +544,7 @@ function ProductoFila({ producto, categorias, variantes, clave, recargar, onSali
                     <input
                       inputMode="numeric"
                       value={stocks[v.sku] ?? String(v.stock)}
-                      onChange={(e) => setStocks((s) => ({ ...s, [v.sku]: e.target.value }))}
+                      onChange={(e) => setStocks((s) => ({ ...s, [v.sku]: soloDigitos(e.target.value) }))}
                       className={entero(stocks[v.sku] ?? v.stock) ? '' : 'admin-invalido'}
                     />
                   </td>

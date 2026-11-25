@@ -35,15 +35,16 @@ Si en algún momento prefieres armar la estructura desde cero en vez de importar
 
 ### Pestaña `Productos`
 
-| id | nombre | categoria | descripcion | precio | imagen | activo | descuento |
-|----|--------|-----------|-------------|--------|--------|--------|-----------|
-| p1 | Vestido Amelia | Vestidos | Vestido midi de manga larga... | 189000 | (vacío o URL de foto) | VERDADERO | 0 |
+| id | nombre | categoria | descripcion | precio | imagen | activo | descuento | descuento_hasta |
+|----|--------|-----------|-------------|--------|--------|--------|-----------|-----------------|
+| p1 | Vestido Amelia | Vestidos | Vestido midi de manga larga... | 189000 | (vacío o URL de foto) | VERDADERO | 0 | 2026-12-31 |
 
 - `id`: identificador único y corto, sin espacios (p1, p2, p3...).
 - `precio`: número sin puntos ni signo de pesos (ej. `189000`).
 - `imagen`: se puede dejar vacío mientras no haya fotos; el sitio muestra un placeholder con el nombre del producto. Cuando haya foto, pegar ahí la URL pública de la imagen.
 - `activo`: `VERDADERO` para que aparezca en el catálogo, `FALSO` para ocultarlo sin borrar la fila.
-- `descuento`: porcentaje entero de 0 a 90 (vacío o 0 = sin descuento). La columna se crea sola la primera vez que se aplica un descuento desde el panel; **no hace falta crearla a mano**. Si se vuelve a importar un CSV de Productos que no la tenga, se pierden los descuentos.
+- `descuento`: porcentaje entero de 0 a 90 (vacío o 0 = sin descuento). La columna se crea sola la primera vez que se aplica un descuento desde el panel; **no hace falta crearla a mano**.
+- `descuento_hasta`: último día en que vale el descuento, como `2026-12-31` (vacío = sin fecha de fin). Pasada esa fecha (hora de Colombia, inclusive) el sitio deja de aplicar el descuento solo; el valor queda en el Sheet y el panel lo marca como «descuento vencido». Si se vuelve a importar un CSV de Productos que no la tenga, se pierden los descuentos.
 
 ### Pestaña `Variantes`
 
@@ -186,19 +187,19 @@ El sitio incluye un panel para **crear productos, editar sus datos y fotos, ajus
 | Cambiar precio | Fila del producto → **Editar** |
 | **Editar nombre, categoría y descripción** | Fila del producto → **Editar** |
 | **Agregar, quitar y reordenar fotos** (la primera es la portada) | Fila del producto → **Editar** → Fotos → **Guardar fotos** |
-| Descuento de un producto (0–90 %) | Fila del producto → **Editar** → Descuento |
-| Descuento a toda una categoría o al catálogo | Botón **Descuentos por categoría** |
+| Descuento de un producto (0–90 %) con **fecha de fin** opcional | Fila del producto → **Editar** → Descuento y «Último día del descuento» |
+| Descuento (con fecha de fin) a toda una categoría o al catálogo | Botón **Descuentos por categoría** |
 | Ocultar o mostrar un producto | Interruptor *Visible/Oculto* de la fila |
 | **Crear un producto nuevo** (datos, tallas y colores, fotos) | Botón **+ Nuevo producto** |
-| **Compartir** un producto con un cliente | Botón **Compartir** de la fila (y de la ficha del producto) |
+| **Compartir** un producto con un cliente | Ícono en **cada tarjeta del catálogo**, botón **Compartir** de la ficha y de la fila del panel |
 
-**Descuentos.** El producto muestra una franja roja con el porcentaje (`-20%`) sobre la foto, el precio nuevo y el precio anterior tachado. El carrito y el mensaje de WhatsApp usan el precio con descuento. El precio final se redondea a la decena (ej. 289.990 − 15 % = 246.490).
+**Descuentos.** El producto muestra una franja roja con el porcentaje (`-20%`) sobre la foto, el precio nuevo y el precio anterior tachado. El carrito y el mensaje de WhatsApp usan el precio con descuento. El precio final se redondea a la decena (ej. 289.990 − 15 % = 246.490). Con **fecha de fin**, la ficha y el mensaje de compartir dicen «hasta el 30 de diciembre». El **carrito siempre cobra el precio vigente**: si un descuento venció o cambió el precio desde que la clienta agregó el producto, el carrito y el mensaje de WhatsApp se actualizan solos. Los precios se pueden escribir con puntos o con signo de pesos (289.990, $ 289.990): el panel deja solo los números.
 
 **Editar un producto existente.** En **Editar** se cambian nombre, categoría, descripción, precio, descuento y stock con **Guardar cambios**, y las fotos con **Guardar fotos** (botones separados). Las fotos nuevas se reducen y se suben igual que al crear un producto; guardar reemplaza la lista completa de fotos del producto (en el orden mostrado). Si se quitan todas, el producto queda con un recuadro gris.
 
 **Producto nuevo.** Se piden referencia (de ahí sale el código interno `r` + referencia en minúsculas), nombre, categoría, precio, descuento, descripción, tallas y colores con su cantidad, y hasta 10 fotos (la primera es la portada). Las fotos se reducen en el navegador (lado mayor 1600 px) y se suben a Cloudinary con el preset sin firma `tezcanela_catalogo`; el script solo acepta direcciones de fotos de esa cuenta de Cloudinary. El script crea una fila en `Productos`, una por talla/color en `Variantes` (SKU `REF-COL-TALLA`) y una por foto en `Imagenes`. No permite repetir una referencia.
 
-**Compartir.** En el celular abre el menú de compartir con la **foto** y un mensaje (nombre, precio con descuento y enlace). En el computador ofrece *Enviar por WhatsApp* y *Copiar mensaje*. El enlace es `…/catalogo/?ver=ID`: carga la página `/catalogo` (que GitHub Pages sirve con éxito y con la tarjeta de vista previa) y la app abre la ficha del producto. La vista previa del enlace es la general del catálogo; la foto del producto va aparte, adjunta, en el celular.
+**Compartir.** Está en cada tarjeta del catálogo (ícono), en la ficha y en el panel. En el celular abre el menú de compartir con la **foto** y un mensaje (nombre, precio con descuento y enlace). En el computador ofrece *Enviar por WhatsApp* y *Copiar mensaje*. El enlace es `…/catalogo/?ver=ID`: carga la página `/catalogo` (que GitHub Pages sirve con éxito y con la tarjeta de vista previa) y la app abre la ficha del producto. La vista previa del enlace es la general del catálogo; la foto del producto va aparte, adjunta, en el celular.
 
 ### Cómo funciona
 
@@ -222,7 +223,7 @@ Si el panel dice "El script de Google todavía no tiene esta función", falta el
 
 ### Pruebas
 
-- `node apps-script/prueba_code_gs.cjs` prueba `Code.gs` con un simulador de los servicios de Google (27 pruebas: acceso y bloqueo; descuento por producto y por categoría; edición de nombre/descripción/categoría; reemplazo de fotos; creación de productos —columnas, SKU únicos, referencia repetida, 28 tipos de datos inválidos sin escribir nada, fórmulas, columnas reordenadas—; precio/activo/stock; todo o nada).
+- `node apps-script/prueba_code_gs.cjs` prueba `Code.gs` con un simulador de los servicios de Google (33 pruebas: acceso y bloqueo; descuento por producto y por categoría, con fecha de fin; edición de nombre/descripción/categoría; reemplazo de fotos; creación de productos —columnas, SKU únicos, referencia repetida, 28 tipos de datos inválidos sin escribir nada, fórmulas, columnas reordenadas—; precio/activo/stock; todo o nada).
 - La interfaz se probó de punta a punta contra el `Code.gs` real con hojas simuladas: entrar, descuento de un producto y de una categoría, franja y precio tachado en el catálogo y la ficha, precio con descuento en el carrito, crear un producto con fotos, editar nombre/categoría/descripción y fotos de un producto existente (agregar, quitar, reordenar), menú de compartir y apertura del enlace compartido.
 - Pendiente tras activarlo: una prueba contra el Sheet real y desde un celular.
 
