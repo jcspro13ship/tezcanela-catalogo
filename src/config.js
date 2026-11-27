@@ -27,5 +27,8 @@ export const EMPRESA = {
 
 // Video de portada del catálogo (dirección de Cloudinary). Vacío = sin video.
 // Se reproduce solo, sin sonido y en bucle; la persona puede activar el sonido.
-export const VIDEO_PORTADA = ''
-export const VIDEO_PORTADA_IMAGEN = '' // imagen que se ve mientras carga el video (opcional)
+// Original: "Video Inicio.mov" (vertical 1080x1920, 22 s, 32 MB, HEVC). Cloudinary lo entrega
+// convertido a MP4 H.264 de 720 px (~6 MB), que se reproduce en todos los celulares y navegadores.
+const VIDEO_BASE = 'https://res.cloudinary.com/sa0ainfh/video/upload'
+export const VIDEO_PORTADA = `${VIDEO_BASE}/w_720,q_auto:eco,vc_h264,ac_aac/v1795783308/tezcanela/portada_inicio.mp4`
+export const VIDEO_PORTADA_IMAGEN = `${VIDEO_BASE}/so_1,w_720,q_auto/v1795783308/tezcanela/portada_inicio.jpg` // se ve mientras carga

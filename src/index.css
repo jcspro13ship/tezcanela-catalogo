@@ -1033,14 +1033,20 @@ main {
   border-radius: 10px;
   overflow: hidden;
   background: var(--negro);
-  margin-bottom: 1.5rem;
+  margin: 0 auto 1.5rem;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .portada-video video {
   display: block;
-  width: 100%;
-  max-height: 70vh;
-  object-fit: cover;
+  /* video vertical: se ve completo y centrado, sin recortes */
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 72vh;
+  margin: 0 auto;
+  object-fit: contain;
 }
 
 .portada-sonido {
