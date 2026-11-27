@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useCatalogo } from '../context/CatalogoContext'
 import ProductoCard from '../components/ProductoCard'
+import Portada from '../components/Portada'
 
 const TAMANO_PAGINA = 24
 
@@ -34,6 +35,7 @@ export default function Catalogo() {
 
   return (
     <div className="pagina-catalogo">
+      <Portada />
       <h1>Catálogo</h1>
 
       <div className="catalogo-filtros">

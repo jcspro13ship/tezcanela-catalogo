@@ -18,4 +18,14 @@ export const CLOUDINARY_UPLOAD_URL =
 export const EMPRESA = {
   nombre: 'Tez Canela',
   eslogan: 'Moda que refleja tu esencia',
+  // Texto de presentación que aparece arriba del catálogo (cada elemento es un párrafo).
+  presentacion: [
+    'En Tez Canela somos buscadores de la esencia de la mujer vallecaucana.',
+    'Desde hace 33 años, somos inspiración, seguridad y confianza para la mujer, exaltando su clase, su elegancia y belleza.',
+  ],
 }
+
+// Video de portada del catálogo (dirección de Cloudinary). Vacío = sin video.
+// Se reproduce solo, sin sonido y en bucle; la persona puede activar el sonido.
+export const VIDEO_PORTADA = ''
+export const VIDEO_PORTADA_IMAGEN = '' // imagen que se ve mientras carga el video (opcional)

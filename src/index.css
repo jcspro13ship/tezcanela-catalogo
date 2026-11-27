@@ -1022,3 +1022,63 @@ main {
   color: #b3261e;
   font-size: 0.85rem;
 }
+
+/* Portada del catálogo: video y texto de presentación */
+.portada {
+  margin: 0 0 2rem;
+}
+
+.portada-video {
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--negro);
+  margin-bottom: 1.5rem;
+}
+
+.portada-video video {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  object-fit: cover;
+}
+
+.portada-sonido {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.55);
+  color: var(--blanco);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.portada-texto {
+  max-width: 44rem;
+  margin: 0 auto;
+  text-align: center;
+  padding: 0.5rem 0 0.25rem;
+}
+
+.portada-texto p {
+  margin: 0 0 0.6rem;
+  line-height: 1.6;
+  color: #333;
+}
+
+.portada-texto .portada-destacado {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 1.45rem;
+  line-height: 1.35;
+  color: var(--negro);
+}
+
+@media (max-width: 640px) {
+  .portada-texto .portada-destacado {
+    font-size: 1.2rem;
+  }
+}
